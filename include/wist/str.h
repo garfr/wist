@@ -25,8 +25,11 @@ typedef struct
 
 WistStr wist_str_null_terminate(WistStrRef ref);
 WistStrRef wist_str_from_c(const char *c_str);
+WistStr wist_str_from_slice(const uint8_t *str, size_t len);
 WistStr wist_str_clone(WistStrRef ref);
 WistStrRef wist_str_to_ref(WistStr str);
+
+uint32_t wist_str_hash(WistStrRef ref);
 
 /* Frees a string allocated with libc functions. */
 void wist_str_libc_free(WistStr str);

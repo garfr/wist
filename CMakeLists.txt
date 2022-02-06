@@ -9,6 +9,9 @@ add_executable(wist
                src/petal.c
                src/str.c
                src/win32_fs.c
-               src/membuf.c)
+               src/membuf.c
+               src/lexer.c
+               src/token.c
+               src/sym.c)
 
 include_directories(wist PUBLIC include)

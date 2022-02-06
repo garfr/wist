@@ -15,6 +15,6 @@ typedef struct
 } WistMembuf;
 
 bool wist_membuf_open_file(WistStrRef ref, WistMembuf *out);
-void wist_membuf_free(WistMembuf buf);
+void wist_membuf_destroy(WistMembuf buf);
 
 #endif /* WIST_MEMBUF_H */

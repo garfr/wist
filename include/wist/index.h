@@ -3,10 +3,10 @@
 
 #include <wist/wist.h>
 #include <wist/file.h>
+#include <wist/span.h>
 
 #define WIST_MAP_HEADER
-#define WIST_MAP_KEY_TYPE WistStr
-#define WIST_MAP_VAL_TYPE WistFile
+#define WIST_MAP_KEY_TYPE WistFile
 #define WIST_MAP_TYPE_PREFIX WistFile
 #define WIST_MAP_FUN_PREFIX file_map
 #include <wist/map.c.h>

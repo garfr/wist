@@ -29,7 +29,7 @@ wist_membuf_open_file(WistStrRef ref, WistMembuf *out)
 }
 
 void
-wist_membuf_free(WistMembuf buf)
+wist_membuf_destroy(WistMembuf buf)
 {
     if (buf.t == WIST_MEMBUF_MALLOC)
     {

@@ -55,6 +55,24 @@ wist_str_to_ref(WistStr str)
         .str = str.str,
         .len = str.len,
     };
-    
+
     return ref;
+}
+
+uint32_t
+wist_str_hash(WistStrRef ref)
+{
+    return ref.len;
+}
+
+WistStr
+wist_str_from_slice(const uint8_t *src,
+                    size_t len)
+{
+    WistStr str;
+    uint8_t *buf = WIST_NEW_ARR(uint8_t, len);
+    memcpy(buf, src, len);
+    str.str = buf;
+    str.len = len;
+    return str;
 }

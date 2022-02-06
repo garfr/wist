@@ -8,7 +8,7 @@
 typedef struct
 {
     unsigned _ref;
-//    WistStr abs_path;
+    WistStr abs_path;
     WistMembuf buf;
 } WistFile;
 

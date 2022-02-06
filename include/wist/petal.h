@@ -7,7 +7,7 @@
 struct WistPetal
 {
     WistIndex *index;
-    size_t start_file;
+    WistFileRef* start_file;
 };
 
 #endif /* WIST_PETAL_H */

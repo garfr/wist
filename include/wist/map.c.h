@@ -2,11 +2,14 @@
  * Must define before including. They will be undefined at the end of this file:
  *
  * WIST_MAP_KEY_TYPE
- * WIST_MAP_VAL_TYPE
  * WIST_MAP_FUN_PREFIX
  * WIST_MAP_TYPE_PREFIX
  * WIST_MAP_HASH
  * WIST_MAP_EQ
+ *
+ * Optionals to define:
+ * WIST_MAP_VAL_TYPE
+ * WIST_MAP_DESTRUCTOR
  */
 
 #include <stddef.h>
@@ -48,6 +51,7 @@ typedef struct
 } MAP_TYPE;
 
 void FMANGLE(create)(MAP_TYPE *out);
+void FMANGLE(destroy)(MAP_TYPE *map);
 
 #ifdef VAL_TYPE
 VAL_TYPE *FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key, VAL_TYPE *val);
@@ -65,19 +69,45 @@ KEY_TYPE *FMANGLE(find)(MAP_TYPE *map, KEY_TYPE *key);
 #define INIT_BUCKETS 8
 #endif /* INIT_BUCKETS */
 
-void FMANGLE(create)(MAP_TYPE *out)
+void
+FMANGLE(create)(MAP_TYPE *out)
 {
     out->buckets = WIST_NEW_ARR(MAP_ENTRY_TYPE *, INIT_BUCKETS);
     out->nbuckets = INIT_BUCKETS;
     out->buckets_filled = 0;
 }
 
+void
+FMANGLE(destroy)(MAP_TYPE *map)
+{
+    for (size_t i = 0; i < map->nbuckets; i++)
+    {
+        MAP_ENTRY_TYPE *entry = map->buckets[i];
+        while (entry != NULL)
+        {
+            MAP_ENTRY_TYPE *temp = entry;
+            entry = entry->next;
+#ifdef WIST_MAP_DESTRUCTOR
 #ifdef VAL_TYPE
-VAL_TYPE *FMANGLE(insert)(MAP_TYPE *map,
+            WIST_MAP_DESTRUCTOR(&temp->key, &temp->val);
+#else
+            WIST_MAP_DESTRUCTOR(&temp->key);
+#endif /* VAL_TYPE */
+#endif /* WIST_MAP_DESTRUCTOR */
+            WIST_FREE(temp);
+        }
+    }
+    WIST_FREE(map->buckets);
+}
+
+#ifdef VAL_TYPE
+VAL_TYPE *
+FMANGLE(insert)(MAP_TYPE *map,
                           KEY_TYPE *key,
                           VAL_TYPE *val)
 #else
-    KEY_TYPE *FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key)
+KEY_TYPE *
+FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key)
 #endif /* VAL_TYPE */
 {
     uint32_t hash = WIST_MAP_HASH(key);
@@ -154,8 +184,11 @@ FMANGLE(find)(MAP_TYPE *map,
 
 #ifdef VAL_TYPE
 #undef VAL_TYPE
-#endif
+#endif /* VAL_TYPE */
 
+#ifdef WIST_MAP_DESTRUCTOR
+#undef WIST_MAP_DESTRUCTOR
+#endif /* WIST_MAP_DESTRUCTOR */
 #undef KEY_TYPE
 #undef MAP_ENTRY_TYPE
 #undef WIST_MAP_HASH

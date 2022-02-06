@@ -10,8 +10,12 @@ static WistFileRef *find_or_create_ref(WistIndex *index, WistFile *file,
 static WistFileRef *create_ref(WistIndex *index, WistFile *file,
                                WistStrRef path);
 static WistFile *create_file(WistIndex *index, WistStr abs_path);
-static bool compare_strings(WistStr *s1, WistStr *s2);
-static uint32_t hash_string(WistStr *s);
+static bool compare_strings(WistFile *s1, WistFile *s2);
+static uint32_t hash_string(WistFile *s);
+static bool compare_file_refs(WistFileRef *s1, WistFileRef *s2);
+static uint32_t hash_file_ref(WistFileRef *f);
+static void file_ref_destructor(WistFileRef *ref);
+static void file_destructor(WistFile *file);
 
 /* === PUBLIC FUNCTIONS === */
 
@@ -32,6 +36,8 @@ wist_index_destroy(WistIndex *index)
 {
     if (--index->_ref == 0)
     {
+        file_map_destroy(&index->files);
+        file_ref_map_destroy(&index->file_refs);
         WIST_FREE(index);
     }
 }
@@ -41,7 +47,10 @@ index_file_open(WistIndex *index,
                 WistStrRef path)
 {
     WistStr abs_path = wist_fs_realpath(path);
-    WistFile *file = file_map_find(&index->files, &abs_path);
+    WistFile lookup = {
+        .abs_path = abs_path,
+    };
+    WistFile *file = file_map_find(&index->files, &lookup);
     if (file == NULL)
     {
         file = create_file(index, abs_path);
@@ -58,7 +67,18 @@ index_file_open(WistIndex *index,
     }
 }
 
-void index_file_destroy(WistIndex *index, WistFileRef *ref);
+void
+index_file_destroy(WistIndex *index,
+                   WistFileRef *ref)
+{
+    WistFile *file = ref->file;
+    file->_ref--;
+    if (file->_ref == 0)
+    {
+        wist_str_libc_free(file->abs_path);
+        wist_membuf_destroy(file->buf);
+    }
+}
 
 /* === PRIVATE FUNCTIONS === */
 
@@ -72,7 +92,7 @@ create_ref(WistIndex *index,
     ref.file = file;
     WistStr owned_path = wist_str_clone(path);
     ref.rel_path = owned_path;
-     return file_ref_map_insert(&index->file_refs,&ref);
+    return file_ref_map_insert(&index->file_refs,&ref);
 }
 
 static WistFileRef *
@@ -102,13 +122,14 @@ create_file(WistIndex *index, WistStr abs_path)
     {
         return NULL;
     }
-    return file_map_insert(&index->files, &abs_path, &file);
+    file.abs_path = abs_path;
+    return file_map_insert(&index->files, &file);
 }
 
 static bool
-compare_strings(WistStr *s1, WistStr *s2)
+compare_strings(WistFile *s1, WistFile *s2)
 {
-    return WIST_STREQ(*s1, *s2);
+    return WIST_STREQ(s1->abs_path, s2->abs_path);
 }
 
 static bool
@@ -118,23 +139,35 @@ compare_file_refs(WistFileRef *s1, WistFileRef *s2)
 }
 
 static uint32_t
-hash_string(WistStr *s)
+hash_file(WistFile *f)
 {
-    return s->len;
+    return wist_str_hash(wist_str_to_ref(f->abs_path));
 }
 
 static uint32_t
 hash_file_ref(WistFileRef *f)
 {
-    return f->rel_path.len;
+    return wist_str_hash(wist_str_to_ref(f->rel_path));
 }
 
-#define WIST_MAP_KEY_TYPE WistStr
-#define WIST_MAP_VAL_TYPE WistFile
+static void
+file_ref_destructor(WistFileRef *ref)
+{
+    wist_str_libc_free(ref->rel_path);
+}
+
+static void
+file_destructor(WistFile *file)
+{
+    wist_str_libc_free(file->abs_path);
+}
+
+#define WIST_MAP_KEY_TYPE WistFile
 #define WIST_MAP_TYPE_PREFIX WistFile
 #define WIST_MAP_FUN_PREFIX file_map
 #define WIST_MAP_EQ compare_strings
-#define WIST_MAP_HASH hash_string
+#define WIST_MAP_DESTRUCnTOR file_destructor
+#define WIST_MAP_HASH hash_file
 #define WIST_MAP_IMPLEMENTATION
 #include <wist/map.c.h>
 
@@ -143,5 +176,6 @@ hash_file_ref(WistFileRef *f)
 #define WIST_MAP_FUN_PREFIX file_ref_map
 #define WIST_MAP_EQ compare_file_refs
 #define WIST_MAP_HASH hash_file_ref
+#define WIST_MAP_DESTRUCTOR file_ref_destructor
 #define WIST_MAP_IMPLEMENTATION
 #include <wist/map.c.h>

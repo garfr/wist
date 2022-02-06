@@ -22,10 +22,7 @@ main(int argc, const char *argv[])
         return EXIT_FAILURE;
     }
 
-    printf("Hello, Wist %s!\n", WIST_VERSION);
-
     wist_petal_destroy(petal);
     wist_index_destroy(index);
-
     return EXIT_SUCCESS;
 }
