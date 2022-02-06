@@ -32,10 +32,12 @@ wist_petal_parse(WistIndex *index,
            (char*)petal->start_file->file->buf.data);
     WistLexer *lex = wist_lexer_create(petal->index, petal->start_file);
 
+    WistSpanIndex *spans = &lex->spans;
+
     WistToken tok;
     while ((tok = wist_lexer_next(lex)).t != WIST_TOK_EOF)
     {
-        wist_token_print(tok);
+        wist_token_print(spans, tok);
     }
 
     WistSymTable syms = lex->syms;

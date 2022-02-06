@@ -3,6 +3,7 @@
 
 #include <wist/defs.h>
 #include <wist/sym.h>
+#include <wist/span.h>
 
 typedef enum
 {
@@ -21,8 +22,8 @@ typedef enum
 
 typedef struct
 {
+    WistSpan loc;
     uint8_t t;
-
     union
     {
         int64_t i;
@@ -30,6 +31,6 @@ typedef struct
     };
 } WistToken;
 
-void wist_token_print(WistToken tok);
+void wist_token_print(WistSpanIndex *index, WistToken tok);
 
 #endif /* WIST_TOKEN_H */

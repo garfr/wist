@@ -12,6 +12,7 @@ add_executable(wist
                src/membuf.c
                src/lexer.c
                src/token.c
-               src/sym.c)
+               src/sym.c
+               src/span.c)
 
 include_directories(wist PUBLIC include)

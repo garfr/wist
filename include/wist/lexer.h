@@ -13,9 +13,10 @@ typedef struct
     WistFileRef *start_file;
     WistToken peek;
     bool has_peek;
-    size_t cur, start;
+    uint64_t cur, start;
     WistMembuf buf; /* The currently active buf. */
     WistSymTable syms;
+    WistSpanIndex spans;
 } WistLexer;
 
 WistLexer *wist_lexer_create(WistIndex *index, WistFileRef *start);

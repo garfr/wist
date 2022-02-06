@@ -8,7 +8,7 @@
 #define GET_C(lex) (lex->buf.data[(lex)->cur++])
 #define PEEK_C(lex) ((lex)->buf.data[(lex)->cur])
 #define SKIP_C(lex) ((lex)->cur++)
-#define RESET(lex) ((lex)->start = (lex)->cur)
+#define RESET(lex) lex_reset(lex)
 
 #define ALPHA 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': \
     case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':      \
@@ -23,10 +23,11 @@
     case '8': case '9': case '0'
 /* === PROTOTYPES === */
 
-WistToken lexer_get(WistLexer *lex);
-void skip_whitespace(WistLexer *lex);
-WistSym *lex_sym(WistLexer *lex);
-int64_t lex_int(WistLexer *lex);
+static WistToken lexer_get(WistLexer *lex);
+static void skip_whitespace(WistLexer *lex);
+static WistSym *lex_sym(WistLexer *lex);
+static int64_t lex_int(WistLexer *lex);
+static WistSpan lex_reset(WistLexer *lex);
 
 /* === PUBLIC FUNCTIONS === */
 
@@ -83,7 +84,7 @@ wist_lexer_next(WistLexer *lex)
 
 /* === PRIVATE FUNCTIONS === */
 
-WistToken
+static WistToken
 lexer_get(WistLexer *lex)
 {
     WistToken tok;
@@ -103,27 +104,27 @@ lexer_get(WistLexer *lex)
     case '_':
         SKIP_C(lex);
         tok.t = WIST_TOK_UNDERSCORE;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case '\\':
         SKIP_C(lex);
         tok.t = WIST_TOK_BSLASH;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case ',':
         SKIP_C(lex);
         tok.t = WIST_TOK_COMMA;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case '(':
         SKIP_C(lex);
         tok.t = WIST_TOK_LPAREN;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case ')':
         SKIP_C(lex);
         tok.t = WIST_TOK_RPAREN;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case '-':
         SKIP_C(lex);
@@ -131,36 +132,36 @@ lexer_get(WistLexer *lex)
         {
             SKIP_C(lex);
             tok.t = WIST_TOK_ARROW;
-            RESET(lex);
+            tok.loc = RESET(lex);
             return tok;
         }
         break;
     case ALPHA:
         tok.t = WIST_TOK_SYM;
         tok.sym = lex_sym(lex);
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case DIGIT:
         tok.t = WIST_TOK_INT;
         tok.i = lex_int(lex);
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case ':':
         SKIP_C(lex);
         tok.t = WIST_TOK_COLON;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     case '=':
         SKIP_C(lex);
         tok.t = WIST_TOK_EQ;
-        RESET(lex);
+        tok.loc = RESET(lex);
         return tok;
     }
     printf("ERROR: '%c'\n", c);
     return tok;
 }
 
-void
+static void
 skip_whitespace(WistLexer *lex)
 {
     while (!IS_END(lex) && isspace(PEEK_C(lex)))
@@ -170,7 +171,7 @@ skip_whitespace(WistLexer *lex)
     RESET(lex);
 }
 
-WistSym *
+static WistSym *
 lex_sym(WistLexer *lex)
 {
     int c;
@@ -199,7 +200,7 @@ lex_sym(WistLexer *lex)
     }
 }
 
-int64_t
+static int64_t
 lex_int(WistLexer *lex)
 {
     int c;
@@ -223,4 +224,12 @@ lex_int(WistLexer *lex)
             return total;
         }
     }
+}
+
+static WistSpan
+lex_reset(WistLexer *lex)
+{
+    WistSpan ret = wist_add_span(&lex->spans, lex->start, lex->cur);
+    lex->start = lex->cur;
+    return ret;
 }
