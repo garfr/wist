@@ -40,6 +40,7 @@ uast_type_to_string[] =
     [UAST_EXPR_VAR] = "Var",
     [UAST_EXPR_INT] = "Int",
     [UAST_EXPR_APP] = "Application",
+    [UAST_EXPR_PAREN] = "Paren",
 };
 
 void
@@ -90,12 +91,22 @@ uast_create_app_expr(UAst *uast,
 }
 
 UAstExpr *
-uast_create_paren_expr(UAst *uast, WistSpan loc, UAstExpr *subexpr);
+uast_create_paren_expr(UAst *uast, 
+                       WistSpan loc, 
+                       UAstExpr *subexpr)
+{
+    UAstExpr *ret = uast_create_expr(uast);
+    ret->t = UAST_EXPR_PAREN;
+    ret->loc = loc;
+    ret->paren = subexpr;
+    return ret;
+}
 
 /* === PRIVATE FUNCTIONS === */
 
 static void
-uast_print_expr_indent(UAstExpr *expr, int indent)
+uast_print_expr_indent(UAstExpr *expr, 
+                       int indent)
 {
     for (int i = 0; i < indent; i++)
     {
@@ -109,6 +120,10 @@ uast_print_expr_indent(UAstExpr *expr, int indent)
         break;
     case UAST_EXPR_INT:
         printf(" : %" PRId64, expr->i);
+        break;
+    case UAST_EXPR_PAREN:
+        printf("\n");
+        uast_print_expr_indent(expr->paren, indent + 1);
         break;
     case UAST_EXPR_APP:
     {

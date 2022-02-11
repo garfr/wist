@@ -5,8 +5,9 @@
 #define INIT_ARG_ARR 2
 /* === PROTOTYPES === */
 
-static UAstExpr *parse_bexpr(WistParser *parser, UAst *ast);
-static UAstExpr *parse_cexpr(WistParser *p, UAst *ast);
+static UAstExpr *parse_fexpr(WistParser *parser, UAst *ast);
+static UAstExpr *parse_aexpr(WistParser *p, UAst *ast);
+static UAstExpr *parse_expr(WistParser *p, UAst *ast);
 
 static void bump(WistParser *parser);
 
@@ -26,7 +27,7 @@ wist_parser_parse(WistParser *parser,
                   UAst *uast)
 {
     bump(parser);
-    uast->root = parse_bexpr(parser, uast);
+    uast->root = parse_expr(parser, uast);
 }
 
 void
@@ -39,7 +40,14 @@ wist_parser_destroy(WistParser *parser)
 /* === PRIVATE FUNCTIONS === */
 
 static UAstExpr *
-parse_cexpr(WistParser *p, UAst *ast)
+parse_expr(WistParser *p, 
+           UAst *ast)
+{
+    return parse_fexpr(p, ast);
+}
+
+static UAstExpr *
+parse_aexpr(WistParser *p, UAst *ast)
 {
     UAstExpr *expr;
     switch (p->tok.t)
@@ -52,6 +60,20 @@ parse_cexpr(WistParser *p, UAst *ast)
         expr = uast_create_int_expr(ast, p->tok.loc, p->tok.i);
         bump(p);
         return expr;
+    case WIST_TOK_LPAREN: {
+        WistSpan first_paren = p->tok.loc;
+        bump(p);
+        UAstExpr *expr = parse_expr(p, ast);
+        if (p->tok.t != WIST_TOK_RPAREN)
+        {
+            printf("Error: expected closing paren.\n");
+            return expr;
+        }
+        WistSpan last_paren = p->tok.loc;
+        bump(p);
+        WistSpan full_span = wist_combine_span(&p->lex->spans, first_paren, last_paren);
+        return uast_create_paren_expr(ast, full_span, expr);
+    }
     default:
         return NULL;
     }
@@ -59,14 +81,14 @@ parse_cexpr(WistParser *p, UAst *ast)
 }
 
 static UAstExpr *
-parse_bexpr(WistParser *p, UAst *ast)
+parse_fexpr(WistParser *p, UAst *ast)
 {
-    UAstExpr *fun, *arg, *expr;
-    expr = fun = parse_cexpr(p, ast);
+    UAstExpr *fun, *arg;
+    fun = parse_aexpr(p, ast);
     UAstExpr **args = WIST_NEW_ARR(UAstExpr *, INIT_ARG_ARR);
     size_t nargs = 0;
     size_t aargs = INIT_ARG_ARR;
-    while ((arg = parse_cexpr(p, ast)) != NULL)
+    while ((arg = parse_aexpr(p, ast)) != NULL)
     {
         if (nargs + 1 < aargs)
         {
@@ -74,6 +96,10 @@ parse_bexpr(WistParser *p, UAst *ast)
             args = WIST_REALLOC(UAstExpr *, args, aargs);
         }
         args[nargs++] = arg;
+    }
+    if (nargs == 0)
+    {
+        return fun;
     }
     if (aargs != nargs)
     {
