@@ -7,8 +7,14 @@
 #include <wist/membuf.h>
 #include <wist/sym.h>
 
+#define MAX_LEXER_STATES 256
+
 typedef struct
 {
+    uint64_t states[MAX_LEXER_STATES];
+    size_t state;
+    
+    bool first_token;
     WistIndex *index;
     WistFileRef *start_file;
     WistToken peek;
@@ -17,9 +23,11 @@ typedef struct
     WistMembuf buf; /* The currently active buf. */
     WistSymTable syms;
     WistSpanIndex spans;
+    WistErrorEngine *err_eng;
 } WistLexer;
 
-WistLexer *wist_lexer_create(WistIndex *index, WistFileRef *start);
+WistLexer *wist_lexer_create(WistIndex *index, WistErrorEngine *err_end,
+                             WistFileRef *start);
 void wist_lexer_destroy(WistLexer *lex);
 
 WistToken wist_lexer_peek(WistLexer *lex);

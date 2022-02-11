@@ -28,5 +28,6 @@ void wist_span_index_destroy(WistSpanIndex *index);
 
 WistWideSpan *wist_get_span(WistSpanIndex *index, WistSpan *span);
 WistSpan wist_add_span(WistSpanIndex *index, uint64_t start, uint16_t end);
+WistSpan wist_combine_span(WistSpanIndex *index, WistSpan start, WistSpan end);
 
 #endif /* WIST_SPAN_H */

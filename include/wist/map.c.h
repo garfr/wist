@@ -16,7 +16,6 @@
 
 #include <wist/mem.h>
 
-
 #define CAT(a, b) a##b
 #define PASTE(a, b) CAT(a, b)
 #define JOIN(prefix, name) PASTE(prefix, PASTE(_, name))
@@ -181,7 +180,8 @@ FMANGLE(find)(MAP_TYPE *map,
 #undef WIST_MAP_FUN_PREFIX
 #undef WIST_MAP_TYPE_PREFIX
 #undef MAP_TYPE
-
+#undef TMANGLE
+#undef FMANGLE
 #ifdef VAL_TYPE
 #undef VAL_TYPE
 #endif /* VAL_TYPE */

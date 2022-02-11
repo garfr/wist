@@ -13,6 +13,9 @@ add_executable(wist
                src/lexer.c
                src/token.c
                src/sym.c
-               src/span.c)
+               src/span.c
+               src/error.c
+               src/uast.c
+               src/parser.c)
 
 include_directories(wist PUBLIC include)

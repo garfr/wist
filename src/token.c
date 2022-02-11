@@ -17,6 +17,8 @@ const char *tok_type_to_str[] =
     [WIST_TOK_UNDERSCORE] = "UNDERSCORE",
     [WIST_TOK_ARROW] = "ARROW",
     [WIST_TOK_COMMA] = "COMMA",
+    [WIST_TOK_SCOLON] = "SCOLON",
+    [WIST_TOK_NL_SCOLON] = "NL SCOLON",
 };
 
 void
@@ -35,6 +37,7 @@ wist_token_print(WistSpanIndex *index, WistToken tok)
     case WIST_TOK_UNDERSCORE:
     case WIST_TOK_ARROW:
     case WIST_TOK_COMMA:
+    case WIST_TOK_NL_SCOLON:
         break;
     case WIST_TOK_SYM:
         printf(" : '%.*s'",
@@ -47,14 +50,22 @@ wist_token_print(WistSpanIndex *index, WistToken tok)
     default:
         printf("NO TOKENI PRINT CASE\n");
     }
-    if (tok.loc.len == 0)
+
+    if (index != NULL)
     {
-        WistWideSpan *span = wist_get_span(index, &tok.loc);
-        printf(" : (%" PRIu64 ", %" PRIu64 ")\n", span->start, span->end);
+        if (tok.loc.len == 0)
+        {
+            WistWideSpan *span = wist_get_span(index, &tok.loc);
+            printf(" : (%" PRIu64 ", %" PRIu64 ")\n", span->start, span->end);
+        }
+        else
+        {
+            printf(" : (%" PRIu32 ", %" PRIu32 ")\n", tok.loc.start,
+                   tok.loc.start + tok.loc.len);
+        }
     }
     else
     {
-        printf(" : (%" PRIu32 ", %" PRIu32 ")\n", tok.loc.start,
-               tok.loc.start + tok.loc.len);
+        printf("\n");
     }
 }

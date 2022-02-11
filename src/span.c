@@ -51,3 +51,22 @@ wist_add_span(WistSpanIndex *index,
     ret.len = end - start;
     return ret;
 }
+
+WistSpan 
+wist_combine_span(WistSpanIndex *index, 
+                  WistSpan start, 
+                  WistSpan end)
+{
+    size_t start_idx = start.start;
+    if (start.len == 0)
+    {
+        start_idx = wist_get_span(index, &start)->start;
+    }
+    size_t end_idx = end.start + end.len;
+    if (end.len == 0)
+    {
+        WistWideSpan *wspan = wist_get_span(index, &end);
+        end_idx = wspan->end;
+    }
+    return wist_add_span(index, start_idx, end_idx);
+}

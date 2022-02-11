@@ -15,11 +15,17 @@ typedef enum
     WIST_PETAL_BITS_NONE,
 } WistPetalBits;
 
+typedef struct WistErrorEngine WistErrorEngine;
+typedef struct WistError WistError;
+
 WistIndex *wist_index_create();
-WistPetal *wist_petal_parse(WistIndex *index, const char *filename,
-                            WistPetalBits bits);
+WistPetal *wist_petal_parse(WistIndex *index, WistErrorEngine *err_end,
+                            const char *filename, WistPetalBits bits);
 
 void wist_petal_destroy(WistPetal *petal);
 void wist_index_destroy(WistIndex *index);
+
+WistErrorEngine *wist_error_engine_create(void);
+void wist_error_engine_destroy(WistErrorEngine *eng);
 
 #endif /* WIST_WIST_H */

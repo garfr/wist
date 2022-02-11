@@ -6,6 +6,8 @@
 #include <wist/index.h>
 #include <wist/lexer.h>
 #include <wist/sym.h>
+#include <wist/uast.h>
+#include <wist/parser.h>
 
 /* === PROTOTYPES === */
 
@@ -15,11 +17,10 @@ static WistPetal *wist_petal_create(WistIndex *index, WistPetalBits bits);
 
 WistPetal *
 wist_petal_parse(WistIndex *index,
+                 WistErrorEngine *err_eng,
                  const char *filename,
                  WistPetalBits bits)
 {
-    (void) filename;
-
     WistPetal *petal = wist_petal_create(index, bits);
     WistStrRef filename_ref = wist_str_from_c(filename);
     petal->start_file = index_file_open(index, filename_ref);
@@ -28,19 +29,33 @@ wist_petal_parse(WistIndex *index,
         return NULL;
     }
 
-    printf("%.*s\n", (int) petal->start_file->file->buf.len,
-           (char*)petal->start_file->file->buf.data);
-    WistLexer *lex = wist_lexer_create(petal->index, petal->start_file);
+    WistLexer *lex = wist_lexer_create(petal->index, err_eng,
+                                       petal->start_file);
 
     WistSpanIndex *spans = &lex->spans;
+    WistSymTable syms = lex->syms;
 
+/*
+    
     WistToken tok;
     while ((tok = wist_lexer_next(lex)).t != WIST_TOK_EOF)
     {
         wist_token_print(spans, tok);
-    }
+    }        
+    */
+   // /*
+    UAst uast;
+    uast_create(&uast);
 
-    WistSymTable syms = lex->syms;
+    WistParser parser;
+    wist_parser_create(&parser, lex, err_eng);
+
+    wist_parser_parse(&parser, &uast);
+
+    uast_print_expr(uast.root);
+    wist_parser_destroy(&parser);
+    uast_destroy(&uast);
+//    */
     wist_lexer_destroy(lex);
 
     sym_table_destroy(&syms);

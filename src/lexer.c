@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <wist/lexer.h>
 #include <wist/index.h>
@@ -24,26 +25,34 @@
 /* === PROTOTYPES === */
 
 static WistToken lexer_get(WistLexer *lex);
-static void skip_whitespace(WistLexer *lex);
+static bool skip_whitespace(WistLexer *lex, uint64_t *out, WistSpan *index);
 static WistSym *lex_sym(WistLexer *lex);
 static int64_t lex_int(WistLexer *lex);
 static WistSpan lex_reset(WistLexer *lex);
+static void make_tok_inplace(WistLexer *lex, WistToken *tok, WistTokenType t);
 
 /* === PUBLIC FUNCTIONS === */
 
 WistLexer *
 wist_lexer_create(WistIndex *index,
+                  WistErrorEngine *err_eng,
                   WistFileRef *start)
 {
     WistLexer *lex = WIST_NEW(WistLexer);
-
+    
+    lex->first_token = true;
     lex->index = index;
     lex->start_file = start;
+    lex->err_eng = err_eng;
 
     lex->index->_ref++;
     start->file->_ref++;
+    
+    lex->state = 0;
+    lex->states[lex->state] = 1;
 
     sym_table_create(&lex->syms);
+    wist_span_index_create(&lex->spans);
     lex->start = lex->cur = 0;
     lex->buf = start->file->buf;
     lex->has_peek = false;
@@ -57,6 +66,7 @@ wist_lexer_destroy(WistLexer *lex)
 
     wist_index_destroy(lex->index);
     index_file_destroy(lex->index, lex->start_file);
+    wist_span_index_destroy(&lex->spans);
     WIST_FREE(lex);
 }
 
@@ -90,8 +100,22 @@ lexer_get(WistLexer *lex)
     WistToken tok;
     tok.t = WIST_TOK_EOF;
 
-    skip_whitespace(lex);
-
+    uint64_t indent;
+    WistSpan index;
+    if (skip_whitespace(lex, &indent, &tok.loc))
+    {
+        if (indent == lex->states[lex->state])
+        {
+            tok.t = WIST_TOK_NL_SCOLON;
+            return tok;
+        }
+    }
+    if (lex->first_token)
+    {
+        lex->states[lex->state] = indent;
+        lex->first_token = false;
+    }
+    
     if (IS_END(lex))
     {
         return tok;
@@ -102,37 +126,28 @@ lexer_get(WistLexer *lex)
     switch (c)
     {
     case '_':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_UNDERSCORE;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_UNDERSCORE);
         return tok;
     case '\\':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_BSLASH;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_BSLASH);
         return tok;
     case ',':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_COMMA;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_COMMA);
         return tok;
     case '(':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_LPAREN;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_LPAREN);
+        return tok;
+    case ';':
+        make_tok_inplace(lex, &tok, WIST_TOK_SCOLON);
         return tok;
     case ')':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_RPAREN;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_RPAREN);
         return tok;
     case '-':
         SKIP_C(lex);
         if (PEEK_C(lex) == '>')
         {
-            SKIP_C(lex);
-            tok.t = WIST_TOK_ARROW;
-            tok.loc = RESET(lex);
+            make_tok_inplace(lex, &tok, WIST_TOK_ARROW);
             return tok;
         }
         break;
@@ -147,28 +162,42 @@ lexer_get(WistLexer *lex)
         tok.loc = RESET(lex);
         return tok;
     case ':':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_COLON;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_COLON);
         return tok;
     case '=':
-        SKIP_C(lex);
-        tok.t = WIST_TOK_EQ;
-        tok.loc = RESET(lex);
+        make_tok_inplace(lex, &tok, WIST_TOK_EQ);
         return tok;
     }
     printf("ERROR: '%c'\n", c);
     return tok;
 }
 
-static void
-skip_whitespace(WistLexer *lex)
+static bool
+skip_whitespace(WistLexer *lex, uint64_t *out, WistSpan *span)
 {
+    bool has_newline = false;
+    size_t count = 0;
     while (!IS_END(lex) && isspace(PEEK_C(lex)))
     {
-        SKIP_C(lex);
+        int c = GET_C(lex);
+        if (c == '\n')
+        {
+            *span = wist_add_span(&lex->spans, lex->cur, lex->cur + 1);
+            has_newline = true;
+            count = 0;
+        }
+        else if (c == ' ')
+            count++;
+        else
+        {
+            printf("no tabs!: '%c'\n", c);
+            count += 4;
+        }
     }
+    *out = count;
     RESET(lex);
+
+    return !IS_END(lex) && has_newline;
 }
 
 static WistSym *
@@ -232,4 +261,14 @@ lex_reset(WistLexer *lex)
     WistSpan ret = wist_add_span(&lex->spans, lex->start, lex->cur);
     lex->start = lex->cur;
     return ret;
+}
+
+static void 
+make_tok_inplace(WistLexer *lex, 
+                 WistToken *tok,
+                 WistTokenType t)
+{
+    SKIP_C(lex);
+    tok->t = t;
+    tok->loc = RESET(lex);
 }

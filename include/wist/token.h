@@ -18,6 +18,8 @@ typedef enum
     WIST_TOK_UNDERSCORE,
     WIST_TOK_ARROW,
     WIST_TOK_COMMA,
+    WIST_TOK_SCOLON,
+    WIST_TOK_NL_SCOLON,
 } WistTokenType;
 
 typedef struct
@@ -34,3 +36,4 @@ typedef struct
 void wist_token_print(WistSpanIndex *index, WistToken tok);
 
 #endif /* WIST_TOKEN_H */
+
