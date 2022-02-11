@@ -52,7 +52,7 @@ wist_petal_parse(WistIndex *index,
 
     wist_parser_parse(&parser, &uast);
 
-    uast_print_expr(uast.root);
+    uast_print_decl(uast.root);
     wist_parser_destroy(&parser);
     uast_destroy(&uast);
 //    */
