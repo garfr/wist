@@ -98,6 +98,13 @@ wist_format(const char *str, ...)
                 case '%':
                     bytes_needed -= 1;
                     break;
+                case 's': {
+
+                    WistStrRef *ref = va_arg(l1, WistStrRef *);
+                    bytes_needed += ref->len;
+                    break;
+                }
+                    
                 case 'c':
                     bytes_needed -= 1;
                     break;
@@ -117,6 +124,25 @@ wist_format(const char *str, ...)
                 case '%':
                     buf[pos++] = '%';
                     break;
+                case 's': {
+                    WistStrRef *ref = va_arg(l2, WistStrRef *);
+                    buf[pos++] = '\'';
+                    if (strncmp(ref->str, "\n", 1) == 0)
+                    {
+                        buf[pos++] = ' ';
+                    }
+                    else
+                    {
+                        for (size_t i = 0; i < ref->len; i++)
+                        {
+                            buf[pos++] = ref->str[i];
+                        }
+                    }
+                    buf[pos++] = '\'';
+                    break;
+                }
+                    
+                
                 case 'c': {
                     buf[pos++] = va_arg(l2, uint8_t);
                     break;

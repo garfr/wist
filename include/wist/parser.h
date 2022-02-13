@@ -10,6 +10,7 @@ typedef struct
     WistLexer *lex;
     WistToken tok;
     WistErrorEngine *err;
+
 } WistParser;
 
 void wist_parser_create(WistParser *out, WistLexer *lexer,

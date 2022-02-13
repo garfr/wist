@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include <wist/index.h>
 #include <wist/mem.h>
@@ -126,7 +127,7 @@ create_file(WistIndex *index, WistStr abs_path)
     }
     file.abs_path = abs_path;
     file.idx_start = index->next_idx;
-    file.idx_end = (index->next_idx += file.buf.len);
+    file.idx_end = (index->next_idx += file.buf.len) + 1;
     return file_map_insert(&index->files, &file);
 }
 
@@ -183,7 +184,7 @@ index_get_span_file(WistIndex *index,
     WistFile *file;
     while ((file = file_map_iter_next(&iter)) != NULL)
     {
-        if (file->idx_start <= wspan.start && file->idx_end > wspan.end)
+        if (file->idx_start <= wspan.start && file->idx_end >= wspan.end)
         {
             return file;
         }
@@ -208,6 +209,7 @@ index_get_span(WistIndex *index,
         wspan.start = span->start;
         wspan.end = span->start + span->len;
     }
+
     ref.str = file->buf.data + (wspan.start - file->idx_start);
     ref.len = wspan.end - wspan.start;
     return ref;

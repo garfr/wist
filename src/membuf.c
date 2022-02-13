@@ -22,7 +22,7 @@ wist_membuf_open_file(WistStrRef ref, WistMembuf *out)
     fclose(f);
 
     out->data = buf;
-    out->len = sz;
+    out->len = sz - 1;
     out->t = WIST_MEMBUF_MALLOC;
 
     return true;

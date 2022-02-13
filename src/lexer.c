@@ -36,6 +36,8 @@ static void make_tok_inplace(WistLexer *lex, WistToken *tok, WistTokenType t);
 
 WistLexer *
 wist_lexer_create(WistIndex *index,
+                  WistSpanIndex *spans,
+                  WistSymTable *syms,
                   WistErrorEngine *err_eng,
                   WistFileRef *start)
 {
@@ -45,15 +47,14 @@ wist_lexer_create(WistIndex *index,
     lex->index = index;
     lex->start_file = start;
     lex->err_eng = err_eng;
-
+    
     lex->index->_ref++;
     start->file->_ref++;
     
     lex->state = 0;
     lex->states[lex->state] = 1;
-
-    sym_table_create(&lex->syms);
-    wist_span_index_create(&lex->spans);
+    lex->spans = spans;
+    lex->syms = syms;
     lex->start = lex->cur = 0;
     lex->buf = start->file->buf;
     lex->has_peek = false;
@@ -67,7 +68,6 @@ wist_lexer_destroy(WistLexer *lex)
 
     wist_index_destroy(lex->index);
     index_file_destroy(lex->index, lex->start_file);
-    wist_span_index_destroy(&lex->spans);
     WIST_FREE(lex);
 }
 
@@ -99,7 +99,6 @@ static WistToken
 lexer_get(WistLexer *lex)
 {
     WistToken tok;
-    tok.t = WIST_TOK_EOF;
 
     uint64_t indent;
     bool changed_first_status = false;
@@ -109,6 +108,7 @@ lexer_get(WistLexer *lex)
         if (indent == lex->states[lex->state] && !lex->first_token)
         {
             tok.t = WIST_TOK_NL_SCOLON;
+            tok.loc = RESET(lex);
             return tok;
         }
     }
@@ -121,6 +121,9 @@ lexer_get(WistLexer *lex)
     
     if (IS_END(lex))
     {
+        tok.t = WIST_TOK_EOF;
+        tok.loc = RESET(lex);
+        tok.loc.len = 1;
         return tok;
     }
 
@@ -195,7 +198,7 @@ skip_whitespace(WistLexer *lex, uint64_t *out, WistSpan *span)
         int c = GET_C(lex);
         if (c == '\n')
         {
-            *span = wist_add_span(&lex->spans, lex->cur, lex->cur + 1);
+            *span = wist_add_span(lex->spans, lex->cur, lex->cur + 1);
             has_newline = true;
             count = 0;
         }
@@ -221,7 +224,7 @@ lex_sym(WistLexer *lex)
     {
         if (IS_END(lex))
         {
-            return wist_sym_add(&lex->syms,
+            return wist_sym_add(lex->syms,
                                 lex->buf.data + lex->start,
                                 lex->cur - lex->start);
         }
@@ -235,7 +238,7 @@ lex_sym(WistLexer *lex)
             SKIP_C(lex);
             continue;
         default:
-            return wist_sym_add(&lex->syms,
+            return wist_sym_add(lex->syms,
                                 lex->buf.data + lex->start,
                                 lex->cur - lex->start);
         }
@@ -271,7 +274,7 @@ lex_int(WistLexer *lex)
 static WistSpan
 lex_reset(WistLexer *lex)
 {
-    WistSpan ret = wist_add_span(&lex->spans, lex->start, lex->cur);
+    WistSpan ret = wist_add_span(lex->spans, lex->start, lex->cur);
     lex->start = lex->cur;
     return ret;
 }

@@ -22,12 +22,13 @@ typedef struct
     bool has_peek;
     uint64_t cur, start;
     WistMembuf buf; /* The currently active buf. */
-    WistSymTable syms;
-    WistSpanIndex spans;
+    WistSymTable *syms;
+    WistSpanIndex *spans;
     WistErrorEngine *err_eng;
 } WistLexer;
 
-WistLexer *wist_lexer_create(WistIndex *index, WistErrorEngine *err_end,
+WistLexer *wist_lexer_create(WistIndex *index, WistSpanIndex *spans, 
+                             WistSymTable *syms, WistErrorEngine *err_end,
                              WistFileRef *start);
 void wist_lexer_destroy(WistLexer *lex);
 

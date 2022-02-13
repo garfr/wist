@@ -109,6 +109,15 @@ uast_create_var_expr(UAst *uast,
     ret->var = sym;
     return ret;
 }
+UAstExpr *
+uast_create_err_expr(UAst *uast, 
+                     WistSpan loc)
+{
+    UAstExpr *ret = uast_create_expr(uast);
+    ret->t = UAST_EXPR_ERR;
+    ret->loc = loc;
+    return ret;    
+}
 
 UAstExpr *
 uast_create_int_expr(UAst *uast, 
@@ -195,6 +204,16 @@ uast_create_var_patt(UAst *uast,
     return patt;
 }
 
+UAstPatt *
+uast_create_err_patt(UAst *uast, 
+                     WistSpan loc)
+{
+    UAstPatt *patt = uast_create_patt(uast);
+    patt->t = UAST_PATT_ERR;
+    patt->loc = loc;
+    return patt;
+}
+
 UAstDecl *
 uast_create_decl(UAst *uast)
 {
@@ -219,6 +238,15 @@ uast_create_bind_decl(UAst *uast,
     return decl;
 }
                                 
+UAstDecl *
+uast_create_err_decl(UAst *uast, 
+                 WistSpan loc)
+{
+    UAstDecl *decl = uast_create_decl(uast);
+    decl->t = UAST_DECL_ERR;
+    decl->loc = loc;
+    return decl;
+}
 
 /* === PRIVATE FUNCTIONS === */
 
