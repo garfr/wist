@@ -17,10 +17,10 @@ static WistPetal *wist_petal_create(WistIndex *index, WistPetalBits bits);
 
 WistPetal *
 wist_petal_parse(WistIndex *index,
-                 WistErrorEngine *err_eng,
                  const char *filename,
                  WistPetalBits bits)
 {
+    WistErrorEngine *err = wist_error_engine_create();
     WistPetal *petal = wist_petal_create(index, bits);
     WistStrRef filename_ref = wist_str_from_c(filename);
     petal->start_file = index_file_open(index, filename_ref);
@@ -29,7 +29,7 @@ wist_petal_parse(WistIndex *index,
         return NULL;
     }
 
-    WistLexer *lex = wist_lexer_create(petal->index, err_eng,
+    WistLexer *lex = wist_lexer_create(petal->index, err,
                                        petal->start_file);
 
     WistSpanIndex *spans = &lex->spans;
@@ -48,16 +48,24 @@ wist_petal_parse(WistIndex *index,
     uast_create(&uast);
 
     WistParser parser;
-    wist_parser_create(&parser, lex, err_eng);
+    wist_parser_create(&parser, lex, err);
 
     wist_parser_parse(&parser, &uast);
-
-    uast_print_decl(uast.root);
+    
+    if (wist_error_engine_has_errors(err))
+    {
+        wist_error_engine_print(err, spans, index);
+    }
+    else
+    {
+        uast_print_decl(uast.root);
+    }
+    
     wist_parser_destroy(&parser);
     uast_destroy(&uast);
 //    */
     wist_lexer_destroy(lex);
-
+    
     sym_table_destroy(&syms);
 
     return petal;

@@ -3,6 +3,7 @@
 
 #include <wist/wist.h>
 #include <wist/span.h>
+#include <wist/str.h>
 
 typedef enum
 {
@@ -16,27 +17,30 @@ typedef enum
     WIST_ERROR_UNEXPECTED_CHAR,
 } WistErrorCode;
 
-struct WistError
+typedef struct
 {
     WistErrorLevel level;
     WistErrorCode code;
-    union
-    {
-        struct
-        {
-            WistSpan bad_char;
-            WistSpan bad_token;
-        } unexpected_char;
-    };
-};
+    WistStr msg;
+    WistMultiSpan span;
+} WistError;
 
-struct WistErrorEngine
+typedef struct
 {
     WistError *errs;
     size_t errs_used;
     size_t errs_alloc;
-};
+} WistErrorEngine;
+
+WistErrorEngine *wist_error_engine_create(void);
+void wist_error_engine_destroy(WistErrorEngine *eng);
+int wist_error_engine_has_errors(WistErrorEngine *eng);
+void wist_error_engine_print(WistErrorEngine *eng, WistSpanIndex *spans, 
+                             WistIndex *index);
 
 WistError *wist_add_error(WistErrorEngine *eng);
 
+void wist_fill_error(WistError *err, WistErrorLevel level, WistErrorCode code, 
+                     WistStr msg, WistMultiSpan span);
+                     
 #endif /* WIST_ERROR_H */

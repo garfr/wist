@@ -25,6 +25,7 @@
 
 #define MAP_TYPE TMANGLE(Map)
 #define MAP_ENTRY_TYPE TMANGLE(MapEntry)
+#define MAP_ITER_TYPE TMANGLE(MapIter)
 #define KEY_TYPE WIST_MAP_KEY_TYPE
 
 #ifdef WIST_MAP_VAL_TYPE
@@ -49,13 +50,25 @@ typedef struct
     size_t buckets_filled;
 } MAP_TYPE;
 
+typedef struct
+{
+    size_t idx;
+    MAP_ENTRY_TYPE *cur;
+    MAP_TYPE *map;
+} MAP_ITER_TYPE;
+
 void FMANGLE(create)(MAP_TYPE *out);
 void FMANGLE(destroy)(MAP_TYPE *map);
 
+MAP_ENTRY_TYPE *FMANGLE(iter_fnext)(MAP_ITER_TYPE *);
+MAP_ITER_TYPE FMANGLE(iter_create)(MAP_TYPE *);
+
 #ifdef VAL_TYPE
+VAL_TYPE *FMANGLE(iter_next)(MAP_ITER_TYPE *);
 VAL_TYPE *FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key, VAL_TYPE *val);
 VAL_TYPE *FMANGLE(find)(MAP_TYPE *map, KEY_TYPE *key);
 #else
+KEY_TYPE *FMANGLE(iter_next)(MAP_ITER_TYPE *);
 KEY_TYPE *FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key);
 KEY_TYPE *FMANGLE(find)(MAP_TYPE *map, KEY_TYPE *key);
 #endif /* VAL_TYPE */
@@ -142,6 +155,48 @@ FMANGLE(insert)(MAP_TYPE *map, KEY_TYPE *key)
 #else
     return &new->key;
 #endif /* VAL_TYPE */
+}
+
+#ifdef VAL_TYPE
+VAL_TYPE *
+#else
+KEY_TYPE *
+#endif /* VAL_TYPE */
+FMANGLE(iter_next)(MAP_ITER_TYPE *iter)
+{
+    #ifdef VAL_TYPE
+    return &FMANGLE(iter_fnext)(iter)->val;
+    #else
+    return &FMANGLE(iter_fnext)(iter)->key;
+    #endif /* VAL_TYPE */
+}
+
+MAP_ENTRY_TYPE *
+FMANGLE(iter_fnext)(MAP_ITER_TYPE *iter)
+{
+    if (iter->cur == NULL)
+    {
+        if (++iter->idx >= iter->map->nbuckets)
+        {
+            return NULL;
+        }
+        iter->cur = iter->map->buckets[iter->idx];
+        return FMANGLE(iter_fnext)(iter);
+    }
+    MAP_ENTRY_TYPE *ret = iter->cur;
+    iter->cur = iter->cur->next;
+    return ret;
+}
+
+MAP_ITER_TYPE 
+FMANGLE(iter_create)(MAP_TYPE *map)
+{
+    MAP_ITER_TYPE ret = {
+        .idx = 0,
+        .cur = map->buckets[0],
+        .map = map,
+    };
+    return ret;
 }
 
 #ifdef VAL_TYPE

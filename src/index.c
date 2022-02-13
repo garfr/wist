@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include <wist/index.h>
 #include <wist/mem.h>
 #include <wist/fs.h>
@@ -24,7 +26,7 @@ wist_index_create()
 {
     WistIndex *index = WIST_NEW(WistIndex);
     index->_ref = 1;
-
+    index->next_idx = 0;
     file_map_create(&index->files);
     file_ref_map_create(&index->file_refs);
 
@@ -123,6 +125,8 @@ create_file(WistIndex *index, WistStr abs_path)
         return NULL;
     }
     file.abs_path = abs_path;
+    file.idx_start = index->next_idx;
+    file.idx_end = (index->next_idx += file.buf.len);
     return file_map_insert(&index->files, &file);
 }
 
@@ -160,6 +164,53 @@ static void
 file_destructor(WistFile *file)
 {
     wist_str_libc_free(file->abs_path);
+}
+
+WistFile *
+index_get_span_file(WistIndex *index, 
+                    WistSpanIndex *spans, 
+                    WistSpan *span)
+{
+    WistFileMapIter iter = file_map_iter_create(&index->files);
+    WistWideSpan wspan;
+    if (span->len == 0)
+        wspan = *wist_get_span(spans, span);
+    else
+    {
+        wspan.start = span->start;
+        wspan.end = span->start + span->len;
+    }
+    WistFile *file;
+    while ((file = file_map_iter_next(&iter)) != NULL)
+    {
+        if (file->idx_start <= wspan.start && file->idx_end > wspan.end)
+        {
+            return file;
+        }
+    }
+    
+    printf("THIS SHOULD NEVER HAPPEN\n");
+    exit(EXIT_FAILURE);
+}
+
+WistStrRef 
+index_get_span(WistIndex *index, 
+               WistSpanIndex *spans,
+               WistSpan *span)
+{
+    WistStrRef ref;
+    WistFile *file = index_get_span_file(index, spans, span);
+    WistWideSpan wspan;
+    if (span->len == 0)
+        wspan = *wist_get_span(spans, span);
+    else
+    {
+        wspan.start = span->start;
+        wspan.end = span->start + span->len;
+    }
+    ref.str = file->buf.data + (wspan.start - file->idx_start);
+    ref.len = wspan.end - wspan.start;
+    return ref;
 }
 
 #define WIST_MAP_KEY_TYPE WistFile

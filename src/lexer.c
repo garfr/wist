@@ -4,6 +4,7 @@
 #include <wist/lexer.h>
 #include <wist/index.h>
 #include <wist/mem.h>
+#include <wist/error.h>
 
 #define IS_END(lex) ((lex)->cur >= (lex)->buf.len)
 #define GET_C(lex) (lex->buf.data[(lex)->cur++])
@@ -101,10 +102,11 @@ lexer_get(WistLexer *lex)
     tok.t = WIST_TOK_EOF;
 
     uint64_t indent;
+    bool changed_first_status = false;
     WistSpan index;
     if (skip_whitespace(lex, &indent, &tok.loc))
     {
-        if (indent == lex->states[lex->state])
+        if (indent == lex->states[lex->state] && !lex->first_token)
         {
             tok.t = WIST_TOK_NL_SCOLON;
             return tok;
@@ -114,6 +116,7 @@ lexer_get(WistLexer *lex)
     {
         lex->states[lex->state] = indent;
         lex->first_token = false;
+        changed_first_status = true;
     }
     
     if (IS_END(lex))
@@ -168,8 +171,18 @@ lexer_get(WistLexer *lex)
         make_tok_inplace(lex, &tok, WIST_TOK_EQ);
         return tok;
     }
-    printf("ERROR: '%c'\n", c);
-    return tok;
+    if (changed_first_status)
+    {
+        lex->first_token = true;
+        lex->states[lex->state] = 0;
+    }
+    RESET(lex);
+    SKIP_C(lex);
+    WistError *err = wist_add_error(lex->err_eng);
+    WistStr msg = wist_format("unexpected char '%c'", c);
+    WistMultiSpan span = wist_multispan_create(1, RESET(lex));
+    wist_fill_error(err, WIST_ERROR_ERR, WIST_ERROR_UNEXPECTED_CHAR, msg, span);
+    return lexer_get(lex);
 }
 
 static bool

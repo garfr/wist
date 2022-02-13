@@ -21,11 +21,17 @@ struct WistIndex
 {
     unsigned _ref;
 
+    size_t next_idx;
     WistFileMap files;
     WistFileRefMap file_refs;
 };
 
 WistFileRef *index_file_open(WistIndex *index, WistStrRef path);
 void index_file_destroy(WistIndex *index, WistFileRef *ref);
+
+WistStrRef index_get_span(WistIndex *index, WistSpanIndex *spans, 
+                          WistSpan *span);
+WistFile *index_get_span_file(WistIndex *index, WistSpanIndex *spans, 
+                              WistSpan *span);
 
 #endif /* WIST_INDEX_H */

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdarg.h>
 
 #include <wist/str.h>
 #include <wist/mem.h>
@@ -75,4 +76,63 @@ wist_str_from_slice(const uint8_t *src,
     str.str = buf;
     str.len = len;
     return str;
+}
+
+WistStr
+wist_format(const char *str, ...)
+{
+    va_list l1, l2;
+    va_start(l1, str);
+    va_copy(l2, l1);
+    
+    size_t len = strlen(str);
+    size_t bytes_needed = len;
+    
+    for (size_t i = 0; i < len; i++)
+    {
+        if (str[i] == '%')
+        {
+            i++;
+            switch (str[i])
+            {
+                case '%':
+                    bytes_needed -= 1;
+                    break;
+                case 'c':
+                    bytes_needed -= 1;
+                    break;
+            }
+        }
+    }
+    
+    uint8_t *buf = WIST_NEW_ARR(uint8_t, bytes_needed);
+    size_t pos = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (str[i] == '%')
+        {
+            i++;
+            switch (str[i])
+            {
+                case '%':
+                    buf[pos++] = '%';
+                    break;
+                case 'c': {
+                    buf[pos++] = va_arg(l2, uint8_t);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            buf[pos++] = str[i];
+        }
+    }
+    
+    WistStr ret = {
+        .str = buf,
+        .len = bytes_needed,
+    };    
+    
+    return ret;
 }

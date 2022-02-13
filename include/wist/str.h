@@ -34,4 +34,7 @@ uint32_t wist_str_hash(WistStrRef ref);
 /* Frees a string allocated with libc functions. */
 void wist_str_libc_free(WistStr str);
 
+/* String formatter. */
+WistStr wist_format(const char *str, ...);
+
 #endif /* WIST_STR_H */

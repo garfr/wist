@@ -228,7 +228,7 @@ expect(WistParser *parser,
         bump(parser);
         return true;
     }
-    printf("Error expected: %d\n", t);
+    printf("Error expected: %d, not %d\n", t, parser->tok.t);
     exit(EXIT_FAILURE);
     return false;
 }
@@ -244,7 +244,7 @@ expect_with_tok(WistParser *parser,
         bump(parser);
         return true;
     }
-    printf("Error expected: %d\n", t);
+    printf("Error expected: %d, not %d\n", t, parser->tok.t);
     exit(EXIT_FAILURE);
     return false;
 }

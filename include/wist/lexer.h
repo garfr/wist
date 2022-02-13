@@ -6,6 +6,7 @@
 #include <wist/token.h>
 #include <wist/membuf.h>
 #include <wist/sym.h>
+#include <wist/error.h>
 
 #define MAX_LEXER_STATES 256
 

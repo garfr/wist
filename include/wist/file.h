@@ -10,6 +10,8 @@ typedef struct
     unsigned _ref;
     WistStr abs_path;
     WistMembuf buf;
+    /* First and last bytes this file holds in the current crate. */
+    size_t idx_start, idx_end;
 } WistFile;
 
 typedef struct

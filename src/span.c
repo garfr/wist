@@ -1,3 +1,5 @@
+#include <stdarg.h>
+
 #include <wist/span.h>
 #include <wist/mem.h>
 
@@ -69,4 +71,45 @@ wist_combine_span(WistSpanIndex *index,
         end_idx = wspan->end;
     }
     return wist_add_span(index, start_idx, end_idx);
+}
+
+WistMultiSpan 
+wist_multispan_create(int num_spans,
+                      ...)
+{
+    va_list args;
+    va_start(args, num_spans);
+    WistMultiSpan mspan;
+    mspan.alloc = num_spans;
+    mspan.spans = WIST_NEW_ARR(WistSpan, num_spans);
+    mspan.used = num_spans;
+    for (int i = 0; i < num_spans; i++)
+    {
+        mspan.spans[i] = va_arg(args, WistSpan);
+    }
+    va_end(args);
+    
+    return mspan;
+}
+
+void 
+wist_multispan_destroy(WistMultiSpan *span)
+{
+    WIST_FREE(span->spans);
+}
+
+void 
+wist_get_span_boundary(WistSpanIndex *spans, 
+                  WistSpan *span, 
+                  size_t *os, 
+                  size_t *oe)
+{
+    if (span->len ==0)
+    {
+        WistWideSpan *wspan = wist_get_span(spans, span);
+        *os = wspan->start;
+        *oe = wspan->end;
+    }
+    *os = span->start;
+    *oe = span->start + span->len;
 }
