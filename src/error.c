@@ -67,6 +67,10 @@ wist_error_engine_print(WistErrorEngine *eng)
 {
     for (size_t i = 0; i < eng->errs_used; i++)
     {
+        if (i != 0)
+        {
+            printf("\n");
+        }
         WistError *err = &eng->errs[i];
         printf("%s: %.*s\n", err_level_to_string[err->level], 
                (int) err->msg.len, (char*) err->msg.str);
@@ -144,9 +148,21 @@ wist_error_engine_print(WistErrorEngine *eng)
                 WistSpan *span = &err->span.spans[k];
                 size_t sstart, send;
                 wist_get_span_boundary(eng->spans, span, &sstart, &send);
+                bool eof = false;
+                if (send >= file->idx_start + buf->len)
+                {    
+                    eof = true;
+                    send = end_idx;
+                    sstart--;
+                }
                 if (i <= sstart && end_idx >= send)
                 {
                     size_t spaces = sstart - i;
+                    if (eof)
+                    {
+                        spaces += 2;
+                    }
+                    
                     for (size_t l = 0; l < spaces; l++)
                     {   
                         printf(" ");
@@ -158,7 +174,6 @@ wist_error_engine_print(WistErrorEngine *eng)
                     }
                 }
             }
-            printf("\n");
             i = end_idx + 1;
             line++;
         }

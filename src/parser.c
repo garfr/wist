@@ -212,6 +212,7 @@ parse_fexpr(WistParser *p,
         }
         args[nargs++] = arg;
     }
+    
     if (nargs == 0)
     {
         return fun;
