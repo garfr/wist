@@ -8,12 +8,16 @@
 #define INIT_PATT_ARR 1
 #define INIT_FUN_ARG_ARR 2
 #define INIT_DECLS_ARR 8
+#define INIT_TUPLE_ARR 2
 /* === PROTOTYPES === */
 
 static UAstExpr *parse_fexpr(WistParser *parser, UAst *ast);
 static UAstExpr *parse_aexpr(WistParser *p, UAst *ast);
 static UAstExpr *parse_lexpr(WistParser *p, UAst *ast);
 static UAstExpr *parse_expr(WistParser *p, UAst *ast);
+
+static UAstType *parse_type(WistParser *p, UAst *uast);
+static UAstType *parse_atype(WistParser *p, UAst *ast);
 
 static UAstPatt *parse_patt(WistParser *p, UAst *ast);
 
@@ -75,7 +79,7 @@ parse_decl(WistParser *p, UAst *ast)
 {
     while (check(p, WIST_TOK_NL_SCOLON))
         ; /* DO NOTHING */
-    
+    UAstDecl *decl;
     WistToken sym_tok;
     if (!expect_with_tok(p, WIST_TOK_SYM, &sym_tok))
     {
@@ -84,31 +88,42 @@ parse_decl(WistParser *p, UAst *ast)
         return uast_create_err_decl(ast, p->tok.loc);
     }
 
-    UAstPatt **args = WIST_NEW_ARR(UAstPatt *, INIT_FUN_ARG_ARR);
-
-    size_t nargs = 0;
-    size_t aargs = INIT_FUN_ARG_ARR;
-
-    while (!check(p, WIST_TOK_EQ))
+    if (check(p, WIST_TOK_COLON))
     {
-        if (nargs + 1 > aargs)
-        {
-            aargs *= 2;
-            args = WIST_REALLOC(UAstPatt *, args, INIT_FUN_ARG_ARR);
-        }
-        args[nargs++] = parse_patt(p, ast);
-        if (args[nargs-1]->t == UAST_PATT_ERR)
-        {
-            return uast_create_err_decl(ast, p->tok.loc);
-        }
+        UAstType *type = parse_type(p, ast);
+        WistSpan loc = wist_combine_span(p->lex->spans, sym_tok.loc, type->loc);
+        decl = uast_create_type_decl(ast, loc, sym_tok.sym, type); 
     }
+    else {
+        UAstPatt **args = WIST_NEW_ARR(UAstPatt *, INIT_FUN_ARG_ARR);
+
+        size_t nargs = 0;
+        size_t aargs = INIT_FUN_ARG_ARR;
+
+        while (!check(p, WIST_TOK_EQ))
+        {
+            if (nargs + 1 > aargs)
+            {
+                aargs *= 2;
+                args = WIST_REALLOC(UAstPatt *, args, INIT_FUN_ARG_ARR);
+            }
+            args[nargs++] = parse_patt(p, ast);
+            if (args[nargs-1]->t == UAST_PATT_ERR)
+            {
+                return uast_create_err_decl(ast, p->tok.loc);
+            }
+        }
     
-    if (aargs != nargs && nargs != 0)
-    {
-        args = WIST_REALLOC(UAstPatt *, args, nargs);
-    }
+        if (aargs != nargs && nargs != 0)
+        {
+            args = WIST_REALLOC(UAstPatt *, args, nargs);
+        }
 
-    UAstExpr *body = parse_expr(p, ast);
+        UAstExpr *body = parse_expr(p, ast);
+    
+        WistSpan loc = wist_combine_span(p->lex->spans, sym_tok.loc, body->loc);
+        decl = uast_create_bind_decl(ast, loc, sym_tok.sym, args, nargs, body);
+    }
     
     if (!check(p, WIST_TOK_NL_SCOLON) && !check(p, WIST_TOK_SCOLON) && !check(p, WIST_TOK_EOF))
     {
@@ -117,8 +132,7 @@ parse_decl(WistParser *p, UAst *ast)
         return uast_create_err_decl(ast, p->tok.loc);
     }
     
-    WistSpan loc = wist_combine_span(p->lex->spans, sym_tok.loc, body->loc);
-    return uast_create_bind_decl(ast, loc, sym_tok.sym, args, nargs, body);
+    return decl;
 }
 
 static UAstPatt *
@@ -132,6 +146,49 @@ parse_patt(WistParser *p,
             patt = uast_create_var_patt(ast, p->tok.loc, p->tok.sym);
             bump(p);
             return patt;
+        case WIST_TOK_LPAREN:
+        {
+            WistSpan first_paren = p->tok.loc;
+            bump(p);
+            UAstPatt *patt = parse_patt(p, ast);
+            WistToken last_tok;
+            if (check(p, WIST_TOK_COMMA))
+            {
+                UAstPatt **patts = WIST_NEW_ARR(UAstPatt *, INIT_TUPLE_ARR);
+                size_t apatts = INIT_TUPLE_ARR;
+                size_t npatts = 1;
+                patts[0] = patt;
+                patts[npatts++] = parse_patt(p, ast);
+                
+                while (check(p, WIST_TOK_COMMA))
+                {
+                    if (npatts + 1 >= apatts)
+                    {
+                        apatts *= 2;
+                        patts = WIST_REALLOC(UAstPatt *, patts, apatts);
+                    }
+                    patts[npatts++] = parse_patt(p, ast);
+                }
+                if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_tok))
+                {
+                    err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER,
+                            "expected closing delimiter ')', found %s");
+                    return uast_create_err_patt(ast, p->tok.loc);
+                }
+                WistSpan span = wist_combine_span(p->lex->spans, first_paren, 
+                                                  last_tok.loc);
+                return uast_create_tuple_patt(ast, span, patts, npatts);
+            }
+            if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_tok))
+            {
+                err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER,
+                            "expected closing delimiter ')', found %s");
+                return uast_create_err_patt(ast, p->tok.loc);
+            }
+            WistSpan span = wist_combine_span(p->lex->spans, first_paren, 
+                                              last_tok.loc);
+            return uast_create_paren_patt(ast, span, patt);
+        }
         case WIST_TOK_UNDERSCORE:
             patt = uast_create_wildcard_patt(ast, p->tok.loc);
             bump(p);
@@ -172,14 +229,43 @@ parse_aexpr(WistParser *p,
         WistSpan first_paren = p->tok.loc;
         bump(p);
         UAstExpr *expr = parse_expr(p, ast);
-        if (!expect(p, WIST_TOK_RPAREN))
+        if (check(p, WIST_TOK_COMMA))
+        {
+            UAstExpr **exprs = WIST_NEW_ARR(UAstExpr *, INIT_TUPLE_ARR);
+            size_t aexprs = INIT_TUPLE_ARR;
+            size_t nexprs = 1;
+            exprs[0] = expr;
+            
+            exprs[nexprs++] = parse_expr(p, ast);
+            while (check(p, WIST_TOK_COMMA))
+            {
+                if (nexprs + 1 >= aexprs)
+                {
+                    aexprs *= 2;
+                    exprs = WIST_REALLOC(UAstExpr *, exprs, aexprs);
+                }
+                
+                exprs[nexprs++] = parse_expr(p, ast);
+            }
+            WistToken last_tok;
+            if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_tok))
+            {
+                err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER,
+                            "expected closing delimiter ')', found %s");
+                return uast_create_err_expr(ast, p->tok.loc);
+            }
+            WistSpan full_span = wist_combine_span(p->lex->spans, first_paren, 
+                                                   last_tok.loc);
+            return uast_create_tuple_expr(ast, full_span, exprs, nexprs);
+        }
+        WistToken last_tok;
+        if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_tok))
         {
             err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER, 
-                        "expected closing delimiter ')', foudn %s");
+                        "expected closing delimiter ')', found %s");
             return uast_create_err_expr(ast, p->tok.loc);
         }
-        WistSpan last_paren = p->tok.loc;
-        bump(p);
+        WistSpan last_paren = last_tok.loc;
         WistSpan full_span = wist_combine_span(p->lex->spans, first_paren, last_paren);
         return uast_create_paren_expr(ast, full_span, expr);
     }
@@ -268,6 +354,93 @@ parse_lexpr(WistParser *p,
     WistSpan span = wist_combine_span(p->lex->spans, slash_loc, body->loc);
     UAstExpr *expr = uast_create_lam_expr(ast, span, patts, npatts, body);
     return expr;
+}
+
+static UAstType *
+parse_type(WistParser *p, 
+           UAst *ast)
+{
+    UAstType *lhs;
+    lhs = parse_atype(p, ast);
+    if (lhs == NULL)
+    {
+        err_on_span(p, WIST_ERROR_EXPECTED_TYPE, "expected type, found %s");
+        lhs = uast_create_err_type(ast, p->tok.loc);
+        bump(p);
+        return lhs;
+    }
+    
+    if (check(p, WIST_TOK_ARROW))
+    {
+        UAstType *rhs = parse_type(p, ast);
+        WistSpan span = wist_combine_span(p->lex->spans, lhs->loc, rhs->loc);
+        return uast_create_fun_type(ast, span, lhs, rhs);
+    }
+    
+    return lhs;
+}
+
+static UAstType *
+parse_atype(WistParser *p, 
+            UAst *ast)
+{
+    UAstType *type;
+    switch (p->tok.t)
+    {
+        case WIST_TOK_SYM:
+            type = uast_create_var_type(ast, p->tok.loc,  p->tok.sym);
+            bump(p);
+            return type;
+        case WIST_TOK_LPAREN: {
+            WistSpan first_paren = p->tok.loc;
+            bump(p);
+            UAstType *inner = parse_type(p, ast);
+            WistToken last_paren;
+            if (check(p, WIST_TOK_COMMA))
+            {
+                UAstType **types = WIST_NEW_ARR(UAstType *, INIT_TUPLE_ARR);
+                size_t atypes = INIT_TUPLE_ARR;
+                size_t ntypes = 1;
+                
+                types[0] = inner;
+                
+                types[ntypes++] = parse_type(p, ast);
+                
+                while (check(p, WIST_TOK_COMMA))
+                {
+                    if (ntypes + 1 >= atypes)
+                    {
+                        atypes *= 2;
+                        types = WIST_REALLOC(UAstType *, types, atypes);
+                    }
+                    
+                    types[ntypes++] = parse_type(p, ast);
+                }
+                
+                if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_paren))
+                {
+                    err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER,
+                                "expected closing delimiter ')', found %s");
+                    return uast_create_err_type(ast, p->tok.loc);
+                }
+                
+                WistSpan loc = wist_combine_span(p->lex->spans, 
+                                        first_paren, last_paren.loc);
+                return uast_create_tuple_type(ast, loc, types, ntypes);
+            }
+            if (!expect_with_tok(p, WIST_TOK_RPAREN, &last_paren))
+            {
+                err_on_span(p, WIST_ERROR_EXPECTED_CLOSE_DELIMITER, 
+                            "expected closing delimiter ')', found %s");
+                return uast_create_err_type(ast, p->tok.loc);
+            }
+            WistSpan span = wist_combine_span(p->lex->spans, first_paren, 
+                                              last_paren.loc);
+            return uast_create_paren_type(ast, span, inner);
+        }
+        default:
+            return NULL;
+    }    
 }
 
 static void

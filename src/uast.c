@@ -7,6 +7,7 @@
 static void uast_print_patt_indent(UAstPatt *patt, int indent);
 static void uast_print_expr_indent(UAstExpr *expr, int indent);
 static void uast_print_decl_indent(UAstDecl *decl, int indent);
+static void uast_print_type_indent(UAstType *type, int indent);
 
 static void expr_destroy(UAstExpr *expr);
 
@@ -31,12 +32,20 @@ static void expr_destroy(UAstExpr *expr);
 #define WIST_OBJPOOL_IMPLEMENTATION
 #include <wist/objpool.c.h>
 
+#define WIST_OBJPOOL_TYPE UAstType
+#define WIST_OBJPOOL_FUN_PREFIX uast_type_pool
+#define WIST_OBJPOOL_TYPE_PREFIX UAstType
+#define WIST_OBJPOOL_IMPLEMENTATION
+#include <wist/objpool.c.h>
+
 void
 uast_create(UAst *out)
 {
     uast_expr_pool_create(&out->exprs);
     uast_patt_pool_create(&out->patts);
     uast_decl_pool_create(&out->decls);
+    uast_type_pool_create(&out->types);
+
 }
 
 void
@@ -44,7 +53,7 @@ uast_destroy(UAst *uast)
 {
     uast_expr_pool_destroy(&uast->exprs);
     uast_patt_pool_destroy(&uast->patts);
-    uast_decl_pool_destroy(&uast->decls);
+    uast_type_pool_destroy(&uast->types);
 
 }
 
@@ -62,6 +71,8 @@ uast_expr_type_to_string[] =
     [UAST_EXPR_APP] = "Application",
     [UAST_EXPR_PAREN] = "Paren",
     [UAST_EXPR_LAM] = "Lambda",
+    [UAST_EXPR_ERR] = "Err",
+    [UAST_EXPR_TUPLE] = "Tuple",
 };
 
 const char *
@@ -69,12 +80,27 @@ uast_patt_type_to_string[] =
 {
     [UAST_PATT_VAR] = "Var",
     [UAST_PATT_WILDCARD] = "Wildcard",
+    [UAST_PATT_ERR] = "Err",
+    [UAST_PATT_TUPLE] = "Tuple",
+    [UAST_PATT_PAREN] = "Paren",
 };
 
 const char *
 uast_decl_type_to_string[] =
 {
     [UAST_DECL_BIND] = "Bind",
+    [UAST_DECL_TYPE] = "Type",
+    [UAST_DECL_ERR] = "Err",
+};
+
+const char *
+uast_type_type_to_string[] =
+{
+    [UAST_TYPE_FUN] = "Fun",
+    [UAST_TYPE_VAR] = "Var",
+    [UAST_TYPE_ERR] = "Err",
+    [UAST_TYPE_PAREN] = "Paren",
+    [UAST_TYPE_TUPLE] = "Tuple",
 };
 
 void
@@ -98,6 +124,14 @@ uast_print_decl(UAstDecl *decl)
     printf("\n");
 }
 
+void 
+uast_print_type(UAstType *type)
+{
+    uast_print_type_indent(type, 0);
+    printf("\n");
+}
+
+
 UAstExpr *
 uast_create_var_expr(UAst *uast,
                      WistSpan loc,
@@ -109,6 +143,7 @@ uast_create_var_expr(UAst *uast,
     ret->var = sym;
     return ret;
 }
+
 UAstExpr *
 uast_create_err_expr(UAst *uast, 
                      WistSpan loc)
@@ -175,6 +210,19 @@ uast_create_lam_expr(UAst *uast,
     return ret;
 }
 
+UAstExpr *
+uast_create_tuple_expr(UAst *uast, 
+                       WistSpan loc, 
+                       UAstExpr **exprs, 
+                       size_t nexprs)
+{
+    UAstExpr *ret = uast_create_expr(uast);
+    ret->t = UAST_EXPR_TUPLE;
+    ret->loc = loc;
+    ret->tuple.exprs = exprs;
+    ret->tuple.nexprs = nexprs;
+    return ret;
+}
 
 UAstPatt *
 uast_create_patt(UAst *uast)
@@ -205,6 +253,32 @@ uast_create_var_patt(UAst *uast,
 }
 
 UAstPatt *
+uast_create_tuple_patt(UAst *uast, 
+                       WistSpan loc, 
+                       UAstPatt **patts, 
+                       size_t npatts)
+{
+    UAstPatt *patt = uast_create_patt(uast);
+    patt->t = UAST_PATT_TUPLE;
+    patt->loc = loc;
+    patt->tuple.patts = patts;
+    patt->tuple.npatts = npatts;
+    return patt;
+}
+
+UAstPatt *
+uast_create_paren_patt(UAst *uast, 
+                       WistSpan loc,
+                       UAstPatt *subpatt)
+{
+    UAstPatt *patt = uast_create_patt(uast);
+    patt->t = UAST_PATT_PAREN;
+    patt->loc = loc;
+    patt->paren = subpatt;
+    return patt;
+}
+
+UAstPatt *
 uast_create_err_patt(UAst *uast, 
                      WistSpan loc)
 {
@@ -212,6 +286,74 @@ uast_create_err_patt(UAst *uast,
     patt->t = UAST_PATT_ERR;
     patt->loc = loc;
     return patt;
+}
+
+UAstType *
+uast_create_type(UAst *uast)
+{
+    return uast_type_pool_alloc(&uast->types);
+}
+
+UAstType *
+uast_create_var_type(UAst *uast, 
+                     WistSpan loc, 
+                     WistSym *var)
+{
+    UAstType *type = uast_create_type(uast);
+    type->t = UAST_TYPE_VAR;
+    type->loc = loc;
+    type->var = var;
+    return type;
+}
+
+UAstType *
+uast_create_fun_type(UAst *uast, 
+                     WistSpan loc, 
+                     UAstType *in, 
+                     UAstType *out)
+{
+    UAstType *type = uast_create_type(uast);
+    type->t = UAST_TYPE_FUN;
+    type->loc = loc;
+    type->fun.in = in;
+    type->fun.out = out;
+    return type;
+}
+
+UAstType *
+uast_create_tuple_type(UAst *uast, 
+                       WistSpan loc, 
+                       UAstType **types, 
+                       size_t ntypes)
+{
+    UAstType *type = uast_create_type(uast);
+    type->t = UAST_TYPE_TUPLE;
+    type->loc = loc;
+    type->tuple.types = types;
+    type->tuple.ntypes = ntypes;
+    return type;
+}
+
+UAstType *
+uast_create_err_type(UAst *uast, 
+                     WistSpan loc)
+{
+    UAstType *type = uast_create_type(uast);
+    type->t = UAST_TYPE_ERR;
+    type->loc = loc;
+    return type;
+}
+
+UAstType *
+uast_create_paren_type(UAst *uast, 
+                       WistSpan loc,
+                       UAstType *subtype)
+{
+    UAstType *type = uast_create_type(uast);
+    type->t = UAST_TYPE_PAREN;
+    type->loc = loc;
+    type->paren = subtype;
+    return type;
 }
 
 UAstDecl *
@@ -237,7 +379,21 @@ uast_create_bind_decl(UAst *uast,
     decl->bind.body = body;
     return decl;
 }
-                                
+
+UAstDecl *
+uast_create_type_decl(UAst *uast, 
+                      WistSpan loc, 
+                      WistSym *name, 
+                      UAstType *type)
+{
+    UAstDecl *decl = uast_create_decl(uast);
+    decl->t = UAST_DECL_TYPE;
+    decl->loc = loc;
+    decl->type.name = name;
+    decl->type.type = type;
+    return decl;
+}
+                
 UAstDecl *
 uast_create_err_decl(UAst *uast, 
                  WistSpan loc)
@@ -274,6 +430,11 @@ uast_print_decl_indent(UAstDecl *decl,
             uast_print_expr_indent(decl->bind.body, indent + 1);
             break;
         }   
+        case UAST_DECL_TYPE:
+            printf(" : '%.*s'\n", (int) decl->type.name->str.len, 
+                   (const char *) decl->type.name->str.str);
+            uast_print_type_indent(decl->type.type, indent + 1);
+            break;
     }
 }
 
@@ -292,6 +453,19 @@ uast_print_patt_indent(UAstPatt *patt,
         case UAST_PATT_VAR:
             printf(" : '%.*s'", (int) patt->var->str.len, patt->var->str.str);
             break;
+        case UAST_PATT_PAREN:
+            printf("\n");
+            uast_print_patt_indent(patt->paren, indent + 1);
+            break;
+        case UAST_PATT_TUPLE:
+        {
+            for (size_t i = 0; i < patt->tuple.npatts; i++)
+            {
+                printf("\n");
+                uast_print_patt_indent(patt->tuple.patts[i], indent + 1);
+            }
+            break;
+        }
         case UAST_PATT_WILDCARD:
             break;
     }
@@ -318,6 +492,14 @@ uast_print_expr_indent(UAstExpr *expr,
         printf("\n");
         uast_print_expr_indent(expr->paren, indent + 1);
         break;
+    case UAST_EXPR_TUPLE: {
+        for (size_t i = 0; i < expr->tuple.nexprs; i++)
+        {
+            printf("\n");
+            uast_print_expr_indent(expr->tuple.exprs[i], indent + 1);
+        }
+        break;
+    }
     case UAST_EXPR_APP:
     {
         printf("\n");
@@ -343,6 +525,45 @@ uast_print_expr_indent(UAstExpr *expr,
     }
 }
 
+static void 
+uast_print_type_indent(UAstType *type, 
+                       int indent)
+
+{
+    for (int i = 0; i < indent; i++)
+    {
+        printf("\t");
+    }
+    printf("Type_%s", uast_type_type_to_string[type->t]);
+    switch (type->t)
+    {
+        case UAST_TYPE_PAREN:
+            printf("\n");
+            uast_print_type_indent(type->paren, indent + 1);
+            break;
+        case UAST_TYPE_VAR:
+            printf(" : '%.*s'", (int) type->var->str.len, 
+                   (const char *) type->var->str.str);
+            break;
+        case UAST_TYPE_TUPLE: 
+        {
+            for (size_t i = 0; i < type->tuple.ntypes; i++)
+            {
+                printf("\n");
+                uast_print_type_indent(type->tuple.types[i], indent + 1);
+            }
+            break;
+        }
+        case UAST_TYPE_FUN:
+            printf("\n");
+            uast_print_type_indent(type->fun.in, indent + 1);
+            printf("\n");
+            uast_print_type_indent(type->fun.out, indent + 1);
+            break;
+        case UAST_TYPE_ERR:
+            break;
+    }
+}
 static void 
 expr_destroy(UAstExpr *expr)
 {
