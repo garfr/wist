@@ -10,6 +10,9 @@ static void uast_print_decl_indent(UAstDecl *decl, int indent);
 static void uast_print_type_indent(UAstType *type, int indent);
 
 static void expr_destroy(UAstExpr *expr);
+static void type_destroy(UAstType *type);
+static void patt_destroy(UAstPatt *patt);
+static void decl_destroy(UAstDecl *decl);
 
 /* === PUBLIC FUNCTIONS === */
 
@@ -23,18 +26,21 @@ static void expr_destroy(UAstExpr *expr);
 #define WIST_OBJPOOL_TYPE UAstPatt
 #define WIST_OBJPOOL_FUN_PREFIX uast_patt_pool
 #define WIST_OBJPOOL_TYPE_PREFIX UAstPatt
+#define WIST_OBJPOOL_DESTRUCTOR patt_destroy
 #define WIST_OBJPOOL_IMPLEMENTATION
 #include <wist/objpool.c.h>
 
 #define WIST_OBJPOOL_TYPE UAstDecl
 #define WIST_OBJPOOL_FUN_PREFIX uast_decl_pool
 #define WIST_OBJPOOL_TYPE_PREFIX UAstDecl
+#define WIST_OBJPOOL_DESTRUCTOR decl_destroy
 #define WIST_OBJPOOL_IMPLEMENTATION
 #include <wist/objpool.c.h>
 
 #define WIST_OBJPOOL_TYPE UAstType
 #define WIST_OBJPOOL_FUN_PREFIX uast_type_pool
 #define WIST_OBJPOOL_TYPE_PREFIX UAstType
+#define WIST_OBJPOOL_DESTRUCTOR type_destroy
 #define WIST_OBJPOOL_IMPLEMENTATION
 #include <wist/objpool.c.h>
 
@@ -54,7 +60,8 @@ uast_destroy(UAst *uast)
     uast_expr_pool_destroy(&uast->exprs);
     uast_patt_pool_destroy(&uast->patts);
     uast_type_pool_destroy(&uast->types);
-
+    uast_decl_pool_destroy(&uast->decls);
+    WIST_FREE(uast->roots);
 }
 
 UAstExpr *
@@ -564,11 +571,53 @@ uast_print_type_indent(UAstType *type,
             break;
     }
 }
+
 static void 
 expr_destroy(UAstExpr *expr)
 {
-    if (expr->t == UAST_EXPR_APP)
+    switch (expr->t)
     {
-        WIST_FREE(expr->app.args);
+        case UAST_EXPR_APP:
+            WIST_FREE(expr->app.args);
+            break;
+        case UAST_EXPR_LAM:
+            WIST_FREE(expr->lam.patts);
+            break;
+        case UAST_EXPR_TUPLE:
+            WIST_FREE(expr->tuple.exprs);
+            break;
     }
 }
+static void 
+type_destroy(UAstType *type)
+{
+    switch (type->t)
+    {
+        case UAST_TYPE_TUPLE:
+            WIST_FREE(type->tuple.types);
+            break;
+    }
+}
+
+static void 
+patt_destroy(UAstPatt *patt)
+{
+    switch (patt->t)
+    {
+        case UAST_PATT_TUPLE:
+            WIST_FREE(patt->tuple.patts);
+            break;
+    }
+}
+
+static void 
+decl_destroy(UAstDecl *decl)
+{
+    switch (decl->t)
+    {
+        case UAST_DECL_BIND:
+            WIST_FREE(decl->bind.args);
+            break;
+    }
+}
+

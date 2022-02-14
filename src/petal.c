@@ -38,15 +38,6 @@ wist_petal_parse(WistIndex *index,
     WistLexer *lex = wist_lexer_create(petal->index, &spans, &syms, err,
                                        petal->start_file);
 
-/*
-    
-    WistToken tok;
-    while ((tok = wist_lexer_next(lex)).t != WIST_TOK_EOF)
-    {
-        wist_token_print(spans, tok);
-    }        
-    */
-   // /*
     UAst uast;
     uast_create(&uast);
 
@@ -66,13 +57,14 @@ wist_petal_parse(WistIndex *index,
             uast_print_decl(uast.roots[i]);
         }
     }
-    
-    wist_parser_destroy(&parser);
     uast_destroy(&uast);
-//    */
+
+    wist_parser_destroy(&parser);
     wist_lexer_destroy(lex);
-    
+    wist_error_engine_destroy(err);
+    wist_span_index_destroy(&spans);
     sym_table_destroy(&syms);
+
 
     return petal;
 }

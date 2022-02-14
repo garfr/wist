@@ -301,11 +301,8 @@ parse_fexpr(WistParser *p,
     
     if (nargs == 0)
     {
+        WIST_FREE(args);
         return fun;
-    }
-    if (aargs != nargs)
-    {
-        args = WIST_REALLOC(UAstExpr *, args, nargs);
     }
     
     WistSpan span = wist_combine_span(p->lex->spans, fun->loc, 
