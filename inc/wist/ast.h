@@ -7,6 +7,7 @@
 #ifndef _WIST_AST_H
 #define _WIST_AST_H
 
+#include <wist.h>
 #include <wist/srcloc.h>
 #include <wist/sym.h>
 
@@ -27,7 +28,7 @@ struct wist_ast_expr {
 
         struct {
             struct wist_ast_expr *body;
-            struct wist_sym *arg;
+            struct wist_sym *sym;
         } lam;
 
          struct {
@@ -35,5 +36,18 @@ struct wist_ast_expr {
          } app;
     };
 };
+
+struct wist_ast_expr *wist_ast_create_lam(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_sym *sym, 
+        struct wist_ast_expr *body);
+
+struct wist_ast_expr *wist_ast_create_app(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_ast_expr *fun, 
+        struct wist_ast_expr *arg);
+
+struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_sym *sym);
+
+void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr);
 
 #endif /* _WIST_AST_H */

@@ -16,6 +16,6 @@
 
 #define SLICE_EQ(_s1, _sl1, _s2, _sl2)                                          \
         ((_sl1) == (_sl2)                                                       \
-     && strncmp((const char *) (_s1), (const char *) (_s2), _sl1))
+     && (strncmp((const char *) (_s1), (const char *) (_s2), _sl1) == 0))
 
 #endif /* _WIST_DEFS_H */

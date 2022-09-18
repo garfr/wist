@@ -8,6 +8,8 @@
 #include <wist/defs.h>
 #include <wist/ctx.h>
 
+#include <stdio.h>
+
 void wist_sym_index_init(struct wist_sym_index *index) {
     index->syms = NULL;
 }

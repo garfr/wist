@@ -61,6 +61,8 @@ struct wist_token *wist_lex(struct wist_compiler *comp, const uint8_t *src,
         wist_token_print(comp, tok);
         WIST_VECTOR_PUSH(comp->ctx, &vec, struct wist_token, &tok);
     }
+
+    WIST_VECTOR_PUSH(comp->ctx, &vec, struct wist_token, &tok);
     
     *tokens_len_out = WIST_VECTOR_LEN(&vec, struct wist_token);
     WIST_VECTOR_FIX_SIZE(comp->ctx, &vec);

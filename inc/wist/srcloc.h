@@ -43,6 +43,11 @@ void wist_srcloc_index_finish(struct wist_ctx *ctx, struct wist_srcloc_index *in
 struct wist_srcloc wist_srcloc_index_add(struct wist_ctx *ctx, 
         struct wist_srcloc_index *index, uint64_t start, uint64_t end);
 
+/* Creates a new srcloc with all the info between [l1]'s start and [l2]'s end. */
+struct wist_srcloc wist_srcloc_index_combine(struct wist_ctx *ctx,
+        struct wist_srcloc_index *index, struct wist_srcloc l1, 
+        struct wist_srcloc l2);
+
 /* Returns a slice in the source code represented by the srcloc. */
 const uint8_t *wist_srcloc_index_slice(struct wist_srcloc_index *index, 
         struct wist_srcloc loc, size_t *str_len_out);

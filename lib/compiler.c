@@ -7,6 +7,8 @@
 #include <wist/defs.h>
 #include <wist/compiler.h>
 #include <wist/lexer.h>
+#include <wist/parser.h>
+#include <wist/ast.h>
 
 /* === PROTOTYPES === */
 
@@ -49,6 +51,12 @@ struct wist_parse_result wist_compiler_parse_expr(struct wist_compiler *comp,
     {
         return result;
     }
+
+    struct wist_ast_expr *expr = wist_parse_expr(comp, tokens, tokens_len);
+
+    wist_ast_print_expr(comp, expr);
+
+    *expr_out = expr;
 
     WIST_CTX_FREE_ARR(comp->ctx, tokens, struct wist_token, tokens_len);
 
