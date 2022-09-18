@@ -9,8 +9,7 @@
 
 #include <wist.h>
 
-struct wist_ctx
-{
+struct wist_ctx {
     wist_alloc_fn alloc_fn;
     void *alloc_ud;
 };

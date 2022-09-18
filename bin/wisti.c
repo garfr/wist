@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main()
 {
@@ -23,6 +24,19 @@ int main()
     struct wist_compiler *comp = wist_compiler_create(ctx);
 
     printf("wist compiler created\n");
+
+    const char src[] = "\\f -> (\\x -> f (f x))";
+    struct wist_ast_expr *expr;
+
+    struct wist_parse_result result = wist_compiler_parse_expr(comp, 
+            (const uint8_t *) src, strlen(src), &expr);
+    if (result.has_errors)
+    {
+        printf("errors found in expression\n");
+        return EXIT_FAILURE;
+    }
+
+    wist_parse_result_finish(comp, &result);
 
     wist_compiler_destroy(comp);
 
