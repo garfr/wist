@@ -9,12 +9,20 @@
 
 #include <wist.h>
 
+/* 
+ * A symbol is a unique string of characters, interned by the lexer and used 
+ * by the rest of the compiler to make string handling easier.  Two symbols 
+ * containing the same string will be the same symbol, making equality as 
+ * cheap as pointer comparison. 
+ */
+
 struct wist_sym {
     const uint8_t *str;
     size_t str_len;
     struct wist_sym *next; /* TODO: Use an actual hashmap to speed up symbol interning. */
 };
 
+/* Manages all existing symbols. */
 struct wist_sym_index {
     struct wist_sym *syms;
 };

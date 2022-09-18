@@ -28,15 +28,16 @@ int main()
     const char src[] = "\\f -> (\\x -> f (f x))";
     struct wist_ast_expr *expr;
 
-    struct wist_parse_result result = wist_compiler_parse_expr(comp, 
+    struct wist_parse_result *result = wist_compiler_parse_expr(comp, 
             (const uint8_t *) src, strlen(src), &expr);
-    if (result.has_errors)
+    if (wist_parse_result_has_errors(result))
     {
         printf("errors found in expression\n");
         return EXIT_FAILURE;
     }
 
-    wist_parse_result_finish(comp, &result);
+    wist_parse_result_destroy(comp, result);
+    wist_ast_expr_destroy(comp, expr);
 
     wist_compiler_destroy(comp);
 

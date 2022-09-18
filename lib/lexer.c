@@ -15,7 +15,21 @@ struct wist_lexer {
     struct wist_compiler *comp;
     const uint8_t *src;
     size_t src_len;
+
+    /* 
+     * We keep the interval between the start and end of the currently 
+     * processing token, and then set start to end when we are done 
+     * processing it. 
+     * */
     size_t start, end;
+
+    /* 
+     * If there are multiple unexpected characters in a row, we only report 
+     * the first one, so that a nonsense string like "$&o8a" will not be 
+     * reported as 5 seperate errors.  When [invalid_char_mode] is true, we 
+     * skip past invalid chars but do not report them.
+     */
+    bool invalid_char_mode;
 };
 
 #define INIT_WIST_TOKENS 8
@@ -26,7 +40,7 @@ struct wist_lexer {
 #define RESET(_lexer) ((_lexer)->start = (_lexer)->end)
 #define IS_EOI(_lexer) ((_lexer)->end >= (_lexer)->src_len)
 
-
+/* For pretty printing tokens. */
 const char *token_to_string_map[] = {
     [WIST_TOKEN_BACKSLASH] = "Backslash",
     [WIST_TOKEN_SYM] = "Sym",
@@ -38,10 +52,11 @@ const char *token_to_string_map[] = {
 
 /* === PROTOTYPES === */
 
-static struct wist_token make_tok(struct wist_lexer *lexer, 
+static struct wist_token make_token(struct wist_lexer *lexer, 
         enum wist_token_kind t);
 static void skip_whitespace(struct wist_lexer *lexer);
-static struct wist_token lexer_next(struct wist_lexer *lexer);
+static struct wist_token lex_next(struct wist_lexer *lexer);
+static struct wist_srcloc lexer_get_loc(struct wist_lexer *lexer);
 
 /* === PUBLICS === */
 
@@ -54,25 +69,23 @@ struct wist_token *wist_lex(struct wist_compiler *comp, const uint8_t *src,
         .comp = comp,
         .src = src,
         .src_len = src_len,
+        .invalid_char_mode = false,
     };
 
     struct wist_token tok;
-    while ((tok = lexer_next(&lexer)).t != WIST_TOKEN_EOI) {
-        wist_token_print(comp, tok);
+    while ((tok = lex_next(&lexer)).t != WIST_TOKEN_EOI) {
         WIST_VECTOR_PUSH(comp->ctx, &vec, struct wist_token, &tok);
     }
-
+    /* This is the terminating EOI token. */
     WIST_VECTOR_PUSH(comp->ctx, &vec, struct wist_token, &tok);
     
     *tokens_len_out = WIST_VECTOR_LEN(&vec, struct wist_token);
+    /* If we overallocated tokens, properly allocate them. */
     WIST_VECTOR_FIX_SIZE(comp->ctx, &vec);
     return WIST_VECTOR_DATA(&vec, struct wist_token);
 }
 
 void wist_token_print(struct wist_compiler *comp, struct wist_token tok) {
-    IGNORE(comp);
-    /* TODO: Print source string from span. */
-
     printf("%s", token_to_string_map[tok.t]);
 
     switch (tok.t)
@@ -97,14 +110,15 @@ void wist_token_print(struct wist_compiler *comp, struct wist_token tok) {
 
 /* === PRIVATES === */
 
-static struct wist_token make_tok(struct wist_lexer *lexer, 
+static struct wist_token make_token(struct wist_lexer *lexer, 
         enum wist_token_kind t) {
     struct wist_token tok;
     tok.t = t;
     SKIP_C(lexer);
-    tok.loc = wist_srcloc_index_add(lexer->comp->ctx, &lexer->comp->srclocs, 
-            lexer->start, lexer->end);
+    tok.loc = lexer_get_loc(lexer);
     RESET(lexer);
+    lexer->invalid_char_mode = false; /* We sucessfully returned a token, so 
+                                         we are out of invalid char mode. */
     return tok;
 }
 
@@ -114,7 +128,7 @@ static void skip_whitespace(struct wist_lexer *lexer) {
     }
 }
 
-static struct wist_token lexer_next(struct wist_lexer *lexer) {
+static struct wist_token lex_next(struct wist_lexer *lexer) {
     int c;
 start:
 
@@ -122,10 +136,12 @@ start:
     RESET(lexer);
 
     if (IS_EOI(lexer)) {
-        return make_tok(lexer, WIST_TOKEN_EOI);
+        return make_token(lexer, WIST_TOKEN_EOI);
     }
 
     c = PEEK_C(lexer);
+
+    /* Lex a symbol. */
     if (isalpha(c)) {
         while (!IS_EOI(lexer) && (isalpha((c = PEEK_C(lexer))) || isdigit(c) 
                     || c == '_')) {
@@ -135,7 +151,7 @@ start:
         BACKUP_C(lexer);
         const uint8_t *str = lexer->src + lexer->start;
         size_t len = (lexer->end - lexer->start) + 1;
-        struct wist_token tok = make_tok(lexer, WIST_TOKEN_SYM);
+        struct wist_token tok = make_token(lexer, WIST_TOKEN_SYM);
         tok.sym = wist_sym_index_search(lexer->comp->ctx, &lexer->comp->syms, 
                 str, len);
         return tok;
@@ -144,23 +160,35 @@ start:
     switch (c)
     {
         case '\\':
-            return make_tok(lexer, WIST_TOKEN_BACKSLASH);
+            return make_token(lexer, WIST_TOKEN_BACKSLASH);
         case '(':
-            return make_tok(lexer, WIST_TOKEN_LPAREN);
+            return make_token(lexer, WIST_TOKEN_LPAREN);
         case ')':
-            return make_tok(lexer, WIST_TOKEN_RPAREN);
+            return make_token(lexer, WIST_TOKEN_RPAREN);
         case '-': {
             SKIP_C(lexer);
             if ((c = PEEK_C(lexer)) == '>') {
-                return make_tok(lexer, WIST_TOKEN_THIN_ARROW);
+                return make_token(lexer, WIST_TOKEN_THIN_ARROW);
             }
             break;
 
         }
     }
 
-    printf("invalid character: '%c'\n", c);
+    if (!lexer->invalid_char_mode)
+    {
+        struct wist_diag *diag = wist_compiler_add_diag(lexer->comp, WIST_DIAG_UNEXPECTED_CHAR, WIST_DIAG_ERROR);
+        struct wist_srcloc loc = lexer_get_loc(lexer);
+        wist_diag_add_loc(lexer->comp, diag, loc);
+        lexer->invalid_char_mode = true;
+    }
+
     SKIP_C(lexer);
     goto start;
 
+}
+
+static struct wist_srcloc lexer_get_loc(struct wist_lexer *lexer) {
+    return wist_srcloc_index_add(lexer->comp->ctx, &lexer->comp->srclocs, 
+            lexer->start, lexer->end);
 }

@@ -37,6 +37,8 @@ struct wist_ast_expr {
     };
 };
 
+/* === CONSTRUCTORS === */
+
 struct wist_ast_expr *wist_ast_create_lam(struct wist_compiler *comp, 
         struct wist_srcloc loc, struct wist_sym *sym, 
         struct wist_ast_expr *body);
@@ -47,6 +49,8 @@ struct wist_ast_expr *wist_ast_create_app(struct wist_compiler *comp,
 
 struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp, 
         struct wist_srcloc loc, struct wist_sym *sym);
+
+/* === PRETTY PRINTING === */
 
 void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr);
 

@@ -11,6 +11,7 @@
 
 /* === PROTOTYPES === */
 
+/* The default allocator, just calls malloc/free/realloc. */
 static void *libc_alloc(void *ud, void *ptr, size_t osz, size_t nsz);
 
 /* === PUBLICS === */

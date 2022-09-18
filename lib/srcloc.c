@@ -6,6 +6,12 @@
 
 #include <wist/srcloc.h>
 
+/* 
+ * Whenever we do operations on a srcloc, we must be careful to use the 
+ * correct start and end position, and check if the srcloc is a "fake" srcloc 
+ * that indexes a wsrcloc. 
+ */
+
 void wist_srcloc_index_init(struct wist_ctx *ctx, 
         struct wist_srcloc_index *index, const uint8_t *src, size_t src_len) {
     index->src = src;
@@ -20,7 +26,7 @@ void wist_srcloc_index_finish(struct wist_ctx *ctx, struct wist_srcloc_index *in
 struct wist_srcloc wist_srcloc_index_add(struct wist_ctx *ctx, 
         struct wist_srcloc_index *index, uint64_t start, uint64_t end) {
     struct wist_srcloc loc;
-    if (start > UINT32_MAX || end > UINT32_MAX)
+    if (start > UINT16_MAX || end > UINT16_MAX)
     {
         struct wist_wsrcloc wloc = {
             .start = start,
@@ -30,8 +36,8 @@ struct wist_srcloc wist_srcloc_index_add(struct wist_ctx *ctx,
         loc.start = WIST_VECTOR_LEN(&index->locs, struct wist_wsrcloc);
         loc.len = 0;
     } else {
-        loc.start = (uint32_t) start;
-        loc.len = (uint32_t) (end - start);
+        loc.start = (uint16_t) start;
+        loc.len = (uint16_t) (end - start);
     }
 
     return loc;

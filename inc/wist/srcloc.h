@@ -11,34 +11,37 @@
 #include <wist/vector.h>
 
 /* 
- * A source location to be embedded directly into the AST.  If the data cannot 
- * fit in a 32 bit integer, [len] is set to zero and [start] serves as an 
- * index into the wist_srcloc_index table associated with this srcloc. 
+ * A source location to be embedded directly into the AST.  If the start or 
+ * length cannot fit in a 32 bit integer, [len] is set to zero and [start] 
+ * serves as an index into the wist_srcloc_index table associated with this 
+ * srcloc. 
  */
 struct wist_srcloc {
-    uint32_t start, len; 
+    uint16_t start, len; 
 };
 
+/* A "wide" source location, that can reference any location in the text. */
 struct wist_wsrcloc {
     size_t start, end;
 };
 
+/* Maps between fake srclocs and their wide counterparts. */
 struct wist_srcloc_index {
     struct wist_vector locs;
     const uint8_t *src;
     size_t src_len;
 };
 
-/* Initializes a srcloc_index. */
+/* Initializes an index. */
 void wist_srcloc_index_init(struct wist_ctx *ctx, 
         struct wist_srcloc_index *index, const uint8_t *src, size_t src_len);
 
-/* Releases all data owned by a srcloc_index. */
+/* Releases all data owned by an index. */
 void wist_srcloc_index_finish(struct wist_ctx *ctx, struct wist_srcloc_index *index);
 
 /* 
- * Converts two 64 bit indexes into a valid srcloc, either a pointer to a 
- * wsrcloc or an inline srcloc. 
+ * Converts two 64 bit indexes into a valid srcloc, handling fake srloc 
+ * generation.
  */
 struct wist_srcloc wist_srcloc_index_add(struct wist_ctx *ctx, 
         struct wist_srcloc_index *index, uint64_t start, uint64_t end);

@@ -14,6 +14,8 @@ struct wist_ctx {
     void *alloc_ud;
 };
 
+/* Memory allocation utilities. */
+
 void *_wist_ctx_alloc(struct wist_ctx *ctx, size_t size);
 void _wist_ctx_free(struct wist_ctx *ctx, void *ptr, size_t size);
 void *_wist_ctx_realloc(struct wist_ctx *ctx, void *ptr, size_t osz, size_t nsz);

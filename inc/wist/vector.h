@@ -24,16 +24,24 @@ static void wist_vector_init(struct wist_ctx *ctx, struct wist_vector *vec,
     vec->data = WIST_CTX_NEW_ARR(ctx, uint8_t, item_size * init_items);
 }
 
-static void wist_vector_push(struct wist_ctx *ctx, struct wist_vector *vec,
-        size_t item_size, void *new_item) {
+static void *wist_vector_push_uninit(struct wist_ctx *ctx, struct wist_vector *vec,
+        size_t item_size) {
     if (vec->data_used + item_size >= vec->data_alloc) {
         vec->data = WIST_CTX_RESIZE(ctx, vec->data, uint8_t, vec->data_alloc, 
                 vec->data_alloc * 2);
         vec->data_alloc *= 2;
     }
 
-    memcpy(vec->data + vec->data_used, new_item, item_size);
+    void *ptr = vec->data + vec->data_used;
     vec->data_used += item_size;
+    return ptr;
+}
+
+static void wist_vector_push(struct wist_ctx *ctx, struct wist_vector *vec,
+        size_t item_size, void *new_item) {
+    void *ptr = wist_vector_push_uninit(ctx, vec, item_size);
+
+    memcpy(ptr, new_item, item_size);
 }
 
 static void wist_vector_finish(struct wist_ctx *ctx, struct wist_vector *vec) {
@@ -72,6 +80,8 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 
 #define WIST_VECTOR_PUSH(_ctx, _vec, _type, _item)                             \
     wist_vector_push(_ctx, _vec, sizeof(_type), _item)
+#define WIST_VECTOR_PUSH_UNINIT(_ctx, _vec, _type)                             \
+    wist_vector_push_uninit(_ctx, _vec, sizeof(_type))
 #define WIST_VECTOR_INDEX(_vec, _type, _idx)                                   \
     ((_type *) wist_vector_index(_vec, sizeof(_type), _idx))
 
@@ -81,5 +91,10 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 
 #define WIST_VECTOR_LEN(_vec, _type) ((_vec)->data_alloc / sizeof(_type))
 #define WIST_VECTOR_DATA(_vec, _type) ((_type *) ((_vec)->data))
+
+#define WIST_VECTOR_FOR_EACH(_vec, _type, _var)                                \
+    for (_type *_var = ((_type *) (_vec)->data);                               \
+         ((uint8_t *) _var) < ((_vec)->data + (_vec)->data_used);              \
+         _var = (_type *) ((uint8_t *) _var) + sizeof(_type))
 
 #endif /* _WIST_VECTOR_H */

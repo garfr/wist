@@ -22,10 +22,21 @@ struct wist_parser {
 
 /* === PROTOTYPES === */
 
+/* Parsing helpers*/
+static bool expect(struct wist_parser *parser, struct wist_token *tok, 
+        enum wist_token_kind t);
+
+/* Each of these parse_* expressions represents a terminal in the grammar. */
 static struct wist_ast_expr *parse_expr(struct wist_parser *parser);
 static struct wist_ast_expr *parse_lam_expr(struct wist_parser *parser);
 static struct wist_ast_expr *parse_app_expr(struct wist_parser *parser);
 static struct wist_ast_expr *parse_atomic_expr(struct wist_parser *parser);
+
+/* 
+ * parse_*_maybe variants work the same as the parse_* version but they will 
+ * report an error if the terminal is not matched. 
+ */
+static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser);
 
 /* === PUBLICS === */
 
@@ -42,6 +53,25 @@ struct wist_ast_expr *wist_parse_expr(struct wist_compiler *comp,
 
 /* === PRIVATES === */
 
+static bool expect(struct wist_parser *parser, struct wist_token *tok_out, 
+        enum wist_token_kind t) {
+    struct wist_token tok = NEXT_TOK(parser);
+    if (tok_out != NULL)
+    {
+        *tok_out = tok;
+    }
+
+    if (tok.t != t) {
+        struct wist_diag *diag = wist_compiler_add_diag(parser->comp, 
+                WIST_DIAG_EXPECTED_TOKEN, WIST_DIAG_ERROR);
+        wist_diag_add_loc(parser->comp, diag, tok.loc);
+        diag->expected_token = t;
+        return false;
+    } 
+
+    return true;
+}
+
 static struct wist_ast_expr *parse_expr(struct wist_parser *parser) {
     return parse_lam_expr(parser);
 }
@@ -50,20 +80,30 @@ static struct wist_ast_expr *parse_lam_expr(struct wist_parser *parser) {
     struct wist_token bs_tok = PEEK_TOK(parser);
     if (bs_tok.t == WIST_TOKEN_BACKSLASH) {
         SKIP_TOK(parser);
-        struct wist_token sym_tok = NEXT_TOK(parser);
-        SKIP_TOK(parser); /* Thin arrow. */
+        struct wist_token sym_tok;
+
+        struct wist_sym *sym;
+        if (!expect(parser, &sym_tok, WIST_TOKEN_SYM))
+        {
+            sym = NULL;
+        } else {
+            sym = sym_tok.sym;
+        }
+
+        expect(parser, NULL, WIST_TOKEN_THIN_ARROW); 
         struct wist_ast_expr *body = parse_expr(parser);
+
         struct wist_srcloc full_loc = 
             wist_srcloc_index_combine(parser->comp->ctx,  
                     &parser->comp->srclocs, bs_tok.loc, body->loc);
-        return wist_ast_create_lam(parser->comp, full_loc, sym_tok.sym, body);
+        return wist_ast_create_lam(parser->comp, full_loc, sym, body);
     }
     return parse_app_expr(parser);
 }
 
 static struct wist_ast_expr *parse_app_expr(struct wist_parser *parser) {
     struct wist_ast_expr *arg, *full = parse_atomic_expr(parser);
-    while ((arg = parse_atomic_expr(parser)) != NULL) {
+    while ((arg = parse_atomic_expr_maybe(parser)) != NULL) {
         struct wist_srcloc full_loc = 
             wist_srcloc_index_combine(parser->comp->ctx, 
                     &parser->comp->srclocs, full->loc, arg->loc);
@@ -73,17 +113,18 @@ static struct wist_ast_expr *parse_app_expr(struct wist_parser *parser) {
     return full;
 }
 
-static struct wist_ast_expr *parse_atomic_expr(struct wist_parser *parser) {
+static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser) {
     struct wist_token tok = PEEK_TOK(parser);
 
     switch (tok.t) {
-        case WIST_TOKEN_LPAREN:
-        {
+        case WIST_TOKEN_LPAREN: {
             struct wist_token start_tok = NEXT_TOK(parser);
             struct wist_ast_expr *expr = parse_expr(parser);
             struct wist_token end_tok = NEXT_TOK(parser); 
-            expr->loc = wist_srcloc_index_combine(parser->comp->ctx, 
-                    &parser->comp->srclocs, start_tok.loc, end_tok.loc);
+            if (expr != NULL) {
+                expr->loc = wist_srcloc_index_combine(parser->comp->ctx, 
+                        &parser->comp->srclocs, start_tok.loc, end_tok.loc);
+            }
             return expr;
         }
         case WIST_TOKEN_SYM:
@@ -92,9 +133,23 @@ static struct wist_ast_expr *parse_atomic_expr(struct wist_parser *parser) {
         case WIST_TOKEN_EOI:
         case WIST_TOKEN_RPAREN:
             return NULL;
-        default:
-            wist_token_print(parser->comp, tok);
-            printf("Unhandled case in parse_atomic_expr\n");
+        default: {
+            struct wist_diag *diag = wist_compiler_add_diag(parser->comp, 
+                    WIST_DIAG_EXPECTED_EXPR, WIST_DIAG_ERROR);
+            wist_diag_add_loc(parser->comp, diag, tok.loc);
             return NULL;
+        }
     }
+}
+
+static struct wist_ast_expr *parse_atomic_expr(struct wist_parser *parser) {
+    struct wist_ast_expr *expr = parse_atomic_expr_maybe(parser);
+    if (expr == NULL) {
+        struct wist_token tok = PEEK_TOK(parser);
+        struct wist_diag *diag = wist_compiler_add_diag(parser->comp, 
+                WIST_DIAG_EXPECTED_EXPR, WIST_DIAG_ERROR);
+        wist_diag_add_loc(parser->comp, diag, tok.loc);
+    }
+
+    return expr;
 }
