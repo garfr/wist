@@ -49,7 +49,10 @@ void wist_ctx_destroy(struct wist_ctx *ctx);
  * The Wist AST is organized as a disjoint union which can be manipulated 
  * through the visitor interface.
  */
+
 struct wist_ast_expr;
+struct wist_ast_scope;
+struct wist_ast_type;
 
 /* === COMPILER === */
 

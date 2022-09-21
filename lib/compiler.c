@@ -9,6 +9,7 @@
 #include <wist/lexer.h>
 #include <wist/parser.h>
 #include <wist/ast.h>
+#include <wist/sema.h>
 
 /* === PROTOTYPES === */
 
@@ -17,6 +18,7 @@
 struct wist_compiler *wist_compiler_create(struct wist_ctx *ctx) {
     struct wist_compiler *comp = WIST_CTX_NEW(ctx, struct wist_compiler);
 
+    comp->globals = NULL;
     comp->ctx = ctx;
 
     return comp;
@@ -58,6 +60,8 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
     {
         goto cleanup;
     }
+
+    wist_sema_infer_expr(comp, comp->globals, expr);
 
     wist_ast_print_expr(comp, expr);
 

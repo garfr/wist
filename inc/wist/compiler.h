@@ -21,6 +21,8 @@ struct wist_compiler {
     struct wist_parse_result *cur_result;
     struct wist_sym_index syms;
     struct wist_srcloc_index srclocs;
+    uint64_t next_type_id;
+    struct wist_ast_scope *globals;
 };
 
 struct wist_parse_result {
