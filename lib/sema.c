@@ -10,11 +10,25 @@
 
 #include <stdio.h>
 
+/* There seem to be many implementations of HM type inference using this style 
+ * of an algorithm (Algorithm W), down to the function names, order of steps 
+ * in those functions, etc.  I am not sure what the original implementation 
+ * that looked like this was, but the one I referenced when implementing 
+ * the initial type inference code was: 
+ * https://gist.github.com/louthy/bafb2b8b5701c0842ca405c638b58e80. 
+ * So credit to them.
+ */
+
+/* 
+ * Use to maintain a list of types that are not generic in the current 
+ * scope. 
+ */
 struct type_chain {
     struct wist_ast_type *type;
     struct type_chain *next;
 };
 
+/* Maps from one type to another for creating a "fresh" type. */
 struct type_type_map {
     struct wist_ast_type *key, *val;
     struct type_type_map *next;
@@ -149,7 +163,8 @@ static struct wist_ast_type *fresh_type_rec(struct wist_compiler *comp,
             if (is_generic(type, non_generics)) {
                 struct type_type_map *find = type_type_map_find(mappings, type);
                 if (find == NULL) {
-                    struct wist_ast_type *new_type = wist_ast_create_var_type(comp);
+                    struct wist_ast_type *new_type = 
+                        wist_ast_create_var_type(comp);
                     struct type_type_map *new_mappings = 
                         WIST_CTX_NEW(comp->ctx, struct type_type_map);
                     new_mappings->next = mappings;
