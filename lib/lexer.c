@@ -10,6 +10,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 struct wist_lexer {
     struct wist_compiler *comp;
@@ -44,6 +45,7 @@ struct wist_lexer {
 const char *token_to_string_map[] = {
     [WIST_TOKEN_BACKSLASH] = "Backslash",
     [WIST_TOKEN_SYM] = "Sym",
+    [WIST_TOKEN_INT] = "Int",
     [WIST_TOKEN_THIN_ARROW] = "Thin_Arrow",
     [WIST_TOKEN_LPAREN] = "LParen",
     [WIST_TOKEN_RPAREN] = "RParen",
@@ -92,6 +94,9 @@ void wist_token_print(struct wist_compiler *comp, struct wist_token tok) {
     {
         case WIST_TOKEN_SYM:
             printf(": '%.*s'", (int) tok.sym->str_len, (const char *) tok.sym->str);
+            break;
+        case WIST_TOKEN_INT:
+            printf(": %" PRId64, tok.i);
             break;
         case WIST_TOKEN_EOI:
         case WIST_TOKEN_BACKSLASH:
@@ -156,6 +161,36 @@ start:
                 str, len);
         return tok;
     }
+
+    /* Lex an integer. */
+    if (isdigit(c) || c == '-') {
+        bool neg = false;
+        if (c == '-') {
+            SKIP_C(lexer);
+            if (!isdigit(PEEK_C(lexer))) {
+                BACKUP_C(lexer);
+                goto not_integer;
+            }
+            neg = true;
+        }
+
+        int64_t total = 0;
+        while (!IS_EOI(lexer) && isdigit((c = PEEK_C(lexer)))) {
+            total *= 10;
+            total += (c - '0');
+            SKIP_C(lexer);
+        }
+
+        if (neg) {
+            total *= -1;
+        }
+
+        struct wist_token tok = make_token(lexer, WIST_TOKEN_INT);
+        tok.i = total;
+        return tok;
+    }
+
+not_integer:
 
     switch (c)
     {

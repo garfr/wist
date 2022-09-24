@@ -25,6 +25,7 @@ struct wist_ast_scope {
 enum wist_ast_type_kind {
     WIST_AST_TYPE_FUN,
     WIST_AST_TYPE_VAR,
+    WIST_AST_TYPE_BUILTIN_INT,
 };
 
 struct wist_ast_type {
@@ -47,6 +48,7 @@ enum wist_ast_expr_kind {
     WIST_AST_EXPR_LAM,
     WIST_AST_EXPR_VAR,
     WIST_AST_EXPR_APP,
+    WIST_AST_EXPR_INT_LIT,
 };
 
 struct wist_ast_expr {
@@ -68,6 +70,10 @@ struct wist_ast_expr {
          struct {
              struct wist_ast_expr *fun, *arg;
          } app;
+
+         struct {
+             int64_t val;
+         } int_lit;
     };
 };
 
@@ -84,9 +90,13 @@ struct wist_ast_expr *wist_ast_create_app(struct wist_compiler *comp,
 struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp, 
         struct wist_srcloc loc, struct wist_sym *sym);
 
+struct wist_ast_expr *wist_ast_create_int_lit(struct wist_compiler *comp, 
+        struct wist_srcloc loc, int64_t i);
+
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out);
 struct wist_ast_type *wist_ast_create_var_type(struct wist_compiler *comp);
+struct wist_ast_type *wist_ast_create_builtin_int_type(struct wist_compiler *comp);
 
 /* === PRETTY PRINTING === */
 

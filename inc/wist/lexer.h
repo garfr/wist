@@ -14,9 +14,11 @@
 enum wist_token_kind {
     WIST_TOKEN_BACKSLASH,  /* \\ */
     WIST_TOKEN_SYM,        /* [a-zA-Z][a-zA-Z0-9_]* */
+    WIST_TOKEN_INT, /* -?[0-9] */
     WIST_TOKEN_THIN_ARROW, /* -> */
     WIST_TOKEN_LPAREN,     /* ( */
     WIST_TOKEN_RPAREN,     /* ) */
+
 
     WIST_TOKEN_EOI,
 };
@@ -27,6 +29,7 @@ struct wist_token {
 
     union {
         struct wist_sym *sym;
+        int64_t i;
     };
 };
 

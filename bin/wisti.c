@@ -25,7 +25,7 @@ int main()
 
     printf("wist compiler created\n");
 
-    const char src[] = "(\\f -> (\\x -> f (f x)))";
+    const char src[] = "(\\x -> x) 3";
 
     struct wist_ast_expr *expr;
 

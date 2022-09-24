@@ -12,13 +12,15 @@
 
 const char *ast_expr_to_string_map[] = {
     [WIST_AST_EXPR_LAM] = "Lambda",
+    [WIST_AST_EXPR_APP] = "Application",
     [WIST_AST_EXPR_VAR] = "Variable",
-    [WIST_AST_EXPR_APP] = "Application"
+    [WIST_AST_EXPR_INT_LIT] = "Integer Literal",
 };
 
 const char *ast_type_to_string_map[] = {
     [WIST_AST_TYPE_FUN] = "Function",
     [WIST_AST_TYPE_VAR] = "Variable",
+    [WIST_AST_TYPE_BUILTIN_INT] = "Builtin Integer",
 };
 
 /* === PROTOTYPES === */
@@ -60,6 +62,13 @@ struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp,
     return expr;
 }
 
+struct wist_ast_expr *wist_ast_create_int_lit(struct wist_compiler *comp, 
+        struct wist_srcloc loc, int64_t i) {
+    struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_INT_LIT, loc);
+    expr->int_lit.val = i;
+    return expr;
+}
+
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out) {
     struct wist_ast_type *type = wist_ast_create_type(comp, WIST_AST_TYPE_FUN);
@@ -73,6 +82,10 @@ struct wist_ast_type *wist_ast_create_var_type(struct wist_compiler *comp) {
     type->var.id = comp->next_type_id++;
     type->var.instance = NULL;
     return type;
+}
+
+struct wist_ast_type *wist_ast_create_builtin_int_type(struct wist_compiler *comp) {
+    return wist_ast_create_type(comp, WIST_AST_TYPE_BUILTIN_INT);
 }
 
 void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr) {
@@ -164,6 +177,9 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
             printf(" : '%.*s'", (int) expr->var.sym->str_len, (const char *) 
                     expr->var.sym->str);
             break;
+        case WIST_AST_EXPR_INT_LIT:
+            printf(" : %" PRId64, expr->int_lit.val);
+            break;
     }
 
     if (expr->type != NULL) {
@@ -181,20 +197,22 @@ static void wist_ast_print_type_indent(struct wist_compiler *comp,
         printf("\t");
     }
 
-    printf("%s : ", ast_type_to_string_map[type->t]);
+    printf("%s", ast_type_to_string_map[type->t]);
     switch (type->t) {
         case WIST_AST_TYPE_VAR:
-            printf("%" PRId64, type->var.id);
+            printf(" : %" PRId64, type->var.id);
             if (type->var.instance != NULL) {
                 printf("\n");
                 wist_ast_print_type_indent(comp, type->var.instance, indent + 1);
             }
             break;
         case WIST_AST_TYPE_FUN:
-            printf("\n");
+            printf(" : \n");
             wist_ast_print_type_indent(comp, type->fun.in, indent + 1);
             printf("\n");
             wist_ast_print_type_indent(comp, type->fun.out, indent + 1);
+            break;
+        case WIST_AST_TYPE_BUILTIN_INT:
             break;
     }
 }

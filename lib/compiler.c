@@ -119,6 +119,7 @@ void wist_ast_expr_destroy(struct wist_compiler *comp,
             wist_ast_expr_destroy(comp, expr->app.arg);
             break;
         case WIST_AST_EXPR_VAR:
+        case WIST_AST_EXPR_INT_LIT:
             break;
     }
 

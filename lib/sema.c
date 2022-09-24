@@ -100,6 +100,10 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             expr->type = ret_type;
             break;
         }
+        case WIST_AST_EXPR_INT_LIT: {
+            expr->type = wist_ast_create_builtin_int_type(comp);
+            break;
+        }
         default:
             printf("Invalid case in infer_expr_rec\n");
             return NULL;
@@ -126,6 +130,8 @@ static bool type_eq(struct wist_ast_type *t1, struct wist_ast_type *t2) {
         case WIST_AST_TYPE_FUN:
             return type_eq(t1->fun.in, t2->fun.in) 
                 && type_eq(t1->fun.out, t2->fun.out);
+        case WIST_AST_TYPE_BUILTIN_INT:
+            return true;
     }
 
     printf("Invalid case in type_eq.\n");
@@ -182,6 +188,9 @@ static struct wist_ast_type *fresh_type_rec(struct wist_compiler *comp,
         case WIST_AST_TYPE_FUN: {
             return wist_ast_create_fun_type(comp, type->fun.in, type->fun.out);
         }
+        case WIST_AST_TYPE_BUILTIN_INT: {
+            return wist_ast_create_builtin_int_type(comp);
+        }
     }
 
     printf("invalid case in fresh_type_rec.\n");
@@ -220,6 +229,8 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
             unify(comp, t1->fun.out, t2->fun.out);
             break;
         }
+        case WIST_AST_TYPE_BUILTIN_INT:
+            break;
         case WIST_AST_TYPE_VAR: 
             break; /* Impossible, we checked above. */
     }
@@ -236,6 +247,7 @@ static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
             break;
         }
         case WIST_AST_TYPE_VAR:
+        case WIST_AST_TYPE_BUILTIN_INT:
             break;
     }
 
@@ -254,9 +266,7 @@ static void prune_full_expr(struct wist_compiler *comp,
             prune_full_expr(comp, expr->app.arg);
             break;
         case WIST_AST_EXPR_VAR:
-            break;
-        default:
-            printf("invalid case in prune_full_expr.\n");
+        case WIST_AST_EXPR_INT_LIT:
             break;
     }
 }
