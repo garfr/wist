@@ -20,6 +20,7 @@ struct wist_compiler *wist_compiler_create(struct wist_ctx *ctx) {
 
     comp->globals = NULL;
     comp->ctx = ctx;
+    WIST_OBJPOOL_INIT(comp->ctx, &comp->type_pool, struct wist_ast_type);
 
     return comp;
 }
@@ -29,6 +30,7 @@ void wist_compiler_destroy(struct wist_compiler *comp) {
         return;
     }
 
+    wist_objpool_finish(&comp->type_pool);
     wist_sym_index_finish(comp->ctx, &comp->syms);
     wist_srcloc_index_finish(comp->ctx, &comp->srclocs);
 
@@ -106,24 +108,6 @@ struct wist_diag *wist_compiler_add_diag(struct wist_compiler *comp,
 void wist_diag_add_loc(struct wist_compiler *comp, struct wist_diag *diag, 
         struct wist_srcloc loc) {
     WIST_VECTOR_PUSH(comp->ctx, &diag->locs, struct wist_srcloc, &loc);
-}
-
-void wist_ast_expr_destroy(struct wist_compiler *comp, 
-        struct wist_ast_expr *expr) {
-    switch (expr->t) {
-        case WIST_AST_EXPR_LAM:
-            wist_ast_expr_destroy(comp, expr->lam.body);
-            break;
-        case WIST_AST_EXPR_APP:
-            wist_ast_expr_destroy(comp, expr->app.fun);
-            wist_ast_expr_destroy(comp, expr->app.arg);
-            break;
-        case WIST_AST_EXPR_VAR:
-        case WIST_AST_EXPR_INT_LIT:
-            break;
-    }
-
-    WIST_CTX_FREE(comp->ctx, expr, struct wist_ast_expr);
 }
 
 /* === PRIVATES === */

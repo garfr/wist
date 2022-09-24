@@ -19,13 +19,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    printf("wist context created\n");
-
     struct wist_compiler *comp = wist_compiler_create(ctx);
 
-    printf("wist compiler created\n");
+    struct wist_vm *vm = wist_vm_create(ctx);
 
-    const char src[] = "(\\x -> x) 3";
+    const char src[] = "(\\f -> (\\x -> f (f x)))";
 
     struct wist_ast_expr *expr;
 
@@ -37,9 +35,13 @@ int main()
         return EXIT_FAILURE;
     }
 
+    struct wist_vm_handle *val = wist_compiler_vm_gen_expr(comp, vm, expr);
+    (void) val; /* TODO: Execute val. */
+
     wist_parse_result_destroy(comp, result);
     wist_ast_expr_destroy(comp, expr);
 
+    wist_vm_destroy(vm);
     wist_compiler_destroy(comp);
 
     wist_ctx_destroy(ctx);
