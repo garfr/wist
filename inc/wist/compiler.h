@@ -11,6 +11,8 @@
 #include <wist/sym.h>
 #include <wist/srcloc.h>
 #include <wist/diag.h>
+#include <wist/lir.h>
+#include <wist/objpool.h>
 
 /* 
  * All the needed state to compile one compilation unit of Wist, both in one 
@@ -23,6 +25,10 @@ struct wist_compiler {
     struct wist_srcloc_index srclocs;
     uint64_t next_type_id;
     struct wist_ast_scope *globals;
+    /* Type variables. */
+    struct wist_objpool type_var_pool; 
+    /* All other types. */
+    struct wist_objpool type_pool;
 };
 
 struct wist_parse_result {
@@ -40,6 +46,7 @@ struct wist_diag *wist_compiler_add_diag(struct wist_compiler *comp,
  */
 void wist_diag_add_loc(struct wist_compiler *comp, struct wist_diag *diag, 
         struct wist_srcloc loc);
+
 
 #endif /* _WIST_COMPILER_H */
 

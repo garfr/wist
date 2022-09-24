@@ -34,6 +34,15 @@ struct type_type_map {
     struct type_type_map *next;
 };
 
+/*
+ * We pass over all the types and map non-instance type vars to generic 
+ * types. 
+ */
+struct type_var_renamer {
+    uint64_t *bindings;
+    size_t next_id;
+};
+
 /* === PROTOTYPES === */
 
 static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
@@ -50,18 +59,39 @@ static struct wist_ast_type *prune(struct wist_compiler *comp,
         struct wist_ast_type *type);
 static void unify(struct wist_compiler *comp, struct wist_ast_type *t1, 
         struct wist_ast_type *t2);
+
+/* Repairs and cleanup for our post-inference AST. */
 static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
-        struct wist_ast_type *type);
+        struct wist_ast_type *type, struct type_var_renamer *renamer);
 static void prune_full_expr(struct wist_compiler *comp,
-        struct wist_ast_expr *expr);
+        struct wist_ast_expr *expr, struct type_var_renamer *renamer);
+
+/* Type variable renaming. */
+static void type_var_renamer_init(struct wist_compiler *comp, 
+        struct type_var_renamer *renamer);
+static void type_var_renamer_finish(struct wist_compiler *comp, 
+        struct type_var_renamer *renamer);
+static uint64_t type_var_renamer_rename(struct type_var_renamer *rename, 
+        uint64_t id);
 
 /* === PUBLICS === */
 
 void wist_sema_infer_expr(struct wist_compiler *comp, 
         struct wist_ast_scope *scope, struct wist_ast_expr *expr) {
+    struct type_var_renamer renamer;
+    /* Make sure our type variables start at 0 again. */
+
     comp->next_type_id = 0;
+    WIST_OBJPOOL_INIT(comp->ctx, &comp->type_var_pool, struct wist_ast_type);
     infer_expr_rec(comp, scope, expr, NULL);
-    prune_full_expr(comp, expr);
+
+    type_var_renamer_init(comp, &renamer);
+    prune_full_expr(comp, expr, &renamer);
+
+    type_var_renamer_finish(comp, &renamer); 
+
+    /* Release all the type variables we just pruned/renamed. */
+    wist_objpool_finish(&comp->type_var_pool);
 }
 
 /* === PRIVATES === */
@@ -72,14 +102,18 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
     switch (expr->t) {
         case WIST_AST_EXPR_VAR: {
             struct wist_ast_var_entry *entry = wist_ast_scope_find(scope, expr->var.sym);
+            expr->var.var = entry;
             expr->type = fresh_type(comp, entry->type, non_generics);
             break;
         }
         case WIST_AST_EXPR_LAM: {
             struct wist_ast_type *arg_ty = wist_ast_create_var_type(comp);
             struct wist_ast_scope *new_scope = wist_ast_scope_push(comp, scope);
-            wist_ast_scope_insert(comp, new_scope, expr->lam.sym, arg_ty);
+            struct wist_ast_var_entry *entry = wist_ast_scope_insert(comp, 
+                    new_scope, expr->lam.sym, arg_ty);
 
+            expr->lam.scope = new_scope;
+            expr->lam.var = entry;
             struct type_chain *new_non_generics = WIST_CTX_NEW(comp->ctx, 
                     struct type_chain);
             new_non_generics->next = non_generics;
@@ -87,6 +121,7 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             struct wist_ast_type *ret_ty = infer_expr_rec(comp, new_scope,
                     expr->lam.body, new_non_generics);
 
+            WIST_CTX_FREE(comp->ctx, new_non_generics, struct type_chain);
             expr->type = wist_ast_create_fun_type(comp, arg_ty, ret_ty);
             break;
         }
@@ -100,8 +135,8 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             expr->type = ret_type;
             break;
         }
-        case WIST_AST_EXPR_INT_LIT: {
-            expr->type = wist_ast_create_builtin_int_type(comp);
+        case WIST_AST_EXPR_INT: {
+            expr->type = wist_ast_create_int_type(comp);
             break;
         }
         default:
@@ -130,7 +165,8 @@ static bool type_eq(struct wist_ast_type *t1, struct wist_ast_type *t2) {
         case WIST_AST_TYPE_FUN:
             return type_eq(t1->fun.in, t2->fun.in) 
                 && type_eq(t1->fun.out, t2->fun.out);
-        case WIST_AST_TYPE_BUILTIN_INT:
+        case WIST_AST_TYPE_INT:
+        case WIST_AST_TYPE_GEN:
             return true;
     }
 
@@ -188,9 +224,11 @@ static struct wist_ast_type *fresh_type_rec(struct wist_compiler *comp,
         case WIST_AST_TYPE_FUN: {
             return wist_ast_create_fun_type(comp, type->fun.in, type->fun.out);
         }
-        case WIST_AST_TYPE_BUILTIN_INT: {
-            return wist_ast_create_builtin_int_type(comp);
+        case WIST_AST_TYPE_INT: {
+            return wist_ast_create_int_type(comp);
         }
+        case WIST_AST_TYPE_GEN:
+            break; /* These are created after type inference. */
     }
 
     printf("invalid case in fresh_type_rec.\n");
@@ -229,25 +267,31 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
             unify(comp, t1->fun.out, t2->fun.out);
             break;
         }
-        case WIST_AST_TYPE_BUILTIN_INT:
+        case WIST_AST_TYPE_INT:
             break;
+        case WIST_AST_TYPE_GEN: 
+            break; /* Impossible, added after type inference. */
         case WIST_AST_TYPE_VAR: 
             break; /* Impossible, we checked above. */
     }
 }
 
 static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
-        struct wist_ast_type *type) {
+        struct wist_ast_type *type, struct type_var_renamer *renamer) {
     type = prune(comp, type);
 
     switch (type->t) {
         case WIST_AST_TYPE_FUN: {
-            type->fun.in = prune_full_type(comp, type->fun.in);
-            type->fun.out = prune_full_type(comp, type->fun.out);
+            type->fun.in = prune_full_type(comp, type->fun.in, renamer);
+            type->fun.out = prune_full_type(comp, type->fun.out, renamer);
             break;
         }
-        case WIST_AST_TYPE_VAR:
-        case WIST_AST_TYPE_BUILTIN_INT:
+        case WIST_AST_TYPE_VAR: {
+            int64_t new_id = type_var_renamer_rename(renamer, type->var.id);
+            type = wist_ast_create_gen_type(comp, new_id);
+        }
+        case WIST_AST_TYPE_INT:
+        case WIST_AST_TYPE_GEN:
             break;
     }
 
@@ -255,18 +299,48 @@ static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
 }
 
 static void prune_full_expr(struct wist_compiler *comp,
-        struct wist_ast_expr *expr) {
-    expr->type = prune_full_type(comp, expr->type);
+        struct wist_ast_expr *expr, struct type_var_renamer *renamer) {
+    expr->type = prune_full_type(comp, expr->type, renamer);
     switch (expr->t) {
         case WIST_AST_EXPR_LAM: 
-            prune_full_expr(comp, expr->lam.body);
+            prune_full_expr(comp, expr->lam.body, renamer);
             break;
         case WIST_AST_EXPR_APP: 
-            prune_full_expr(comp, expr->app.fun);
-            prune_full_expr(comp, expr->app.arg);
+            prune_full_expr(comp, expr->app.fun, renamer);
+            prune_full_expr(comp, expr->app.arg, renamer);
             break;
         case WIST_AST_EXPR_VAR:
-        case WIST_AST_EXPR_INT_LIT:
+        case WIST_AST_EXPR_INT:
             break;
     }
+}
+
+static void type_var_renamer_init(struct wist_compiler *comp, 
+        struct type_var_renamer *renamer) {
+    if (comp->next_type_id == 0) {
+        /* We will never call type_var_rename because there are no type vars. */
+        return; 
+    }
+    renamer->bindings = WIST_CTX_NEW_ARR(comp->ctx, uint64_t, comp->next_type_id);
+    renamer->next_id = 0;
+}
+
+static void type_var_renamer_finish(struct wist_compiler *comp, 
+        struct type_var_renamer *renamer) {
+    if (renamer->bindings == NULL) {
+        return; /* We never initialized because there were no type vars. */
+    }
+
+    WIST_CTX_FREE_ARR(comp->ctx, renamer->bindings, uint64_t,  comp->next_type_id);
+    renamer->bindings = NULL;
+    renamer->next_id = 0;
+}
+
+static uint64_t type_var_renamer_rename(struct type_var_renamer *rename, 
+        uint64_t id) {
+    /* 0 means that it is unassigned to a binding, so bindings start at 1. */
+    if (rename->bindings[id] == 0) {
+        rename->bindings[id] = ++rename->next_id;
+    }
+    return rename->bindings[id] - 1;
 }

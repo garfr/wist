@@ -132,7 +132,7 @@ static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser)
             return wist_ast_create_var(parser->comp, tok.loc, tok.sym);
         case WIST_TOKEN_INT:
             SKIP_TOK(parser);
-            return wist_ast_create_int_lit(parser->comp, tok.loc, tok.i);
+            return wist_ast_create_int(parser->comp, tok.loc, tok.i);
         case WIST_TOKEN_EOI:
         case WIST_TOKEN_RPAREN:
             return NULL;

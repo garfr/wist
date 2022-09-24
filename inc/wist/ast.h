@@ -24,8 +24,14 @@ struct wist_ast_scope {
 
 enum wist_ast_type_kind {
     WIST_AST_TYPE_FUN,
-    WIST_AST_TYPE_VAR,
-    WIST_AST_TYPE_BUILTIN_INT,
+    WIST_AST_TYPE_INT,
+    WIST_AST_TYPE_GEN,
+
+    /* 
+     * Vars are only used during type inference. By the end of type inference 
+     * they will be replaced by WIST_AST_TYPE_GENERIC values. 
+     */
+    WIST_AST_TYPE_VAR,     
 };
 
 struct wist_ast_type {
@@ -41,6 +47,10 @@ struct wist_ast_type {
             uint64_t id;
             struct wist_ast_type *instance;
         } var;
+
+        struct {
+            uint64_t id;
+        } gen;
     };
 };
 
@@ -48,7 +58,7 @@ enum wist_ast_expr_kind {
     WIST_AST_EXPR_LAM,
     WIST_AST_EXPR_VAR,
     WIST_AST_EXPR_APP,
-    WIST_AST_EXPR_INT_LIT,
+    WIST_AST_EXPR_INT,
 };
 
 struct wist_ast_expr {
@@ -60,10 +70,15 @@ struct wist_ast_expr {
     union {
         struct {
             struct wist_sym *sym;
+            /* [var] is NULL until semantic analysis is over. */
+            struct wist_ast_var_entry *var;
         } var;
 
         struct {
             struct wist_ast_expr *body;
+            struct wist_ast_scope *scope;
+            /* [var] and [scope] are NULL until semantic analysis is over. */
+            struct wist_ast_var_entry *var;
             struct wist_sym *sym;
         } lam;
 
@@ -73,7 +88,7 @@ struct wist_ast_expr {
 
          struct {
              int64_t val;
-         } int_lit;
+         } i;
     };
 };
 
@@ -90,13 +105,15 @@ struct wist_ast_expr *wist_ast_create_app(struct wist_compiler *comp,
 struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp, 
         struct wist_srcloc loc, struct wist_sym *sym);
 
-struct wist_ast_expr *wist_ast_create_int_lit(struct wist_compiler *comp, 
+struct wist_ast_expr *wist_ast_create_int(struct wist_compiler *comp, 
         struct wist_srcloc loc, int64_t i);
 
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out);
 struct wist_ast_type *wist_ast_create_var_type(struct wist_compiler *comp);
-struct wist_ast_type *wist_ast_create_builtin_int_type(struct wist_compiler *comp);
+struct wist_ast_type *wist_ast_create_gen_type(struct wist_compiler *comp, 
+        uint64_t id);
+struct wist_ast_type *wist_ast_create_int_type(struct wist_compiler *comp);
 
 /* === PRETTY PRINTING === */
 
@@ -107,7 +124,7 @@ void wist_ast_print_type(struct wist_compiler *comp, struct wist_ast_type *type)
 
 struct wist_ast_var_entry *wist_ast_scope_find(struct wist_ast_scope *scope, struct wist_sym *sym);
 struct wist_ast_scope *wist_ast_scope_push(struct wist_compiler *comp, struct wist_ast_scope *scope);
-void wist_ast_scope_insert(struct wist_compiler *comp, 
+struct wist_ast_var_entry *wist_ast_scope_insert(struct wist_compiler *comp, 
         struct wist_ast_scope *scope, struct wist_sym *sym, 
         struct wist_ast_type *type);
 

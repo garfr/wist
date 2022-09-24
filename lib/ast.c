@@ -1,5 +1,5 @@
 /* === lib/ast.c - Abstract syntax tree === 
- * Copyright (C) 2022 Gavin Ratcliff - All Rights Reserved
+ * Copyright (C) 202tRatcliff - All Rights Reserved
  * Part of the Wist reference implementation, under the MIT license.
  * See LICENSE.txt for license information.
 */
@@ -14,13 +14,14 @@ const char *ast_expr_to_string_map[] = {
     [WIST_AST_EXPR_LAM] = "Lambda",
     [WIST_AST_EXPR_APP] = "Application",
     [WIST_AST_EXPR_VAR] = "Variable",
-    [WIST_AST_EXPR_INT_LIT] = "Integer Literal",
+    [WIST_AST_EXPR_INT] = "Integer",
 };
 
 const char *ast_type_to_string_map[] = {
     [WIST_AST_TYPE_FUN] = "Function",
     [WIST_AST_TYPE_VAR] = "Variable",
-    [WIST_AST_TYPE_BUILTIN_INT] = "Builtin Integer",
+    [WIST_AST_TYPE_GEN] = "Generic",
+    [WIST_AST_TYPE_INT] = "Integer",
 };
 
 /* === PROTOTYPES === */
@@ -34,6 +35,12 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
         struct wist_ast_expr *expr, int indent);
 static void wist_ast_print_type_indent(struct wist_compiler *comp, 
         struct wist_ast_type *type, int indent);
+
+static void wist_ast_scope_destroy(struct wist_compiler *comp, 
+        struct wist_ast_scope *scope);
+
+static void wist_ast_type_destroy(struct wist_compiler *comp,
+        struct wist_ast_type *type);
 
 /* === PUBLICS === */
 
@@ -62,10 +69,10 @@ struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp,
     return expr;
 }
 
-struct wist_ast_expr *wist_ast_create_int_lit(struct wist_compiler *comp, 
+struct wist_ast_expr *wist_ast_create_int(struct wist_compiler *comp, 
         struct wist_srcloc loc, int64_t i) {
-    struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_INT_LIT, loc);
-    expr->int_lit.val = i;
+    struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_INT, loc);
+    expr->i.val = i;
     return expr;
 }
 
@@ -77,15 +84,23 @@ struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
     return type;
 }
 
+struct wist_ast_type *wist_ast_create_gen_type(struct wist_compiler *comp, 
+        uint64_t id) {
+    struct wist_ast_type *type = wist_ast_create_type(comp, WIST_AST_TYPE_GEN);
+    type->gen.id = id;
+    return type;
+}
+
 struct wist_ast_type *wist_ast_create_var_type(struct wist_compiler *comp) {
-    struct wist_ast_type *type = wist_ast_create_type(comp, WIST_AST_TYPE_VAR);
+    struct wist_ast_type *type = WIST_OBJPOOL_ALLOC(&comp->type_var_pool, struct wist_ast_type);
+    type->t = WIST_AST_TYPE_VAR;
     type->var.id = comp->next_type_id++;
     type->var.instance = NULL;
     return type;
 }
 
-struct wist_ast_type *wist_ast_create_builtin_int_type(struct wist_compiler *comp) {
-    return wist_ast_create_type(comp, WIST_AST_TYPE_BUILTIN_INT);
+struct wist_ast_type *wist_ast_create_int_type(struct wist_compiler *comp) {
+    return wist_ast_create_type(comp, WIST_AST_TYPE_INT);
 }
 
 void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr) {
@@ -121,7 +136,7 @@ struct wist_ast_scope *wist_ast_scope_push(struct wist_compiler *comp,
     return new_scope;
 }
 
-void wist_ast_scope_insert(struct wist_compiler *comp, 
+struct wist_ast_var_entry *wist_ast_scope_insert(struct wist_compiler *comp, 
         struct wist_ast_scope *scope, struct wist_sym *sym, 
         struct wist_ast_type *type) {
     struct wist_ast_var_entry *new_entry = WIST_CTX_NEW(comp->ctx, 
@@ -130,9 +145,60 @@ void wist_ast_scope_insert(struct wist_compiler *comp,
     new_entry->type = type;
     new_entry->next = scope->vars;
     scope->vars = new_entry;
+    return new_entry;
 }
 
-/* === PRIVATE === */
+void wist_ast_expr_destroy(struct wist_compiler *comp, 
+        struct wist_ast_expr *expr) {
+    switch (expr->t) {
+        case WIST_AST_EXPR_LAM:
+            wist_ast_scope_destroy(comp, expr->lam.scope);
+            wist_ast_expr_destroy(comp, expr->lam.body);
+            break;
+        case WIST_AST_EXPR_APP:
+            wist_ast_expr_destroy(comp, expr->app.fun);
+            wist_ast_expr_destroy(comp, expr->app.arg);
+            break;
+        case WIST_AST_EXPR_VAR:
+        case WIST_AST_EXPR_INT:
+            break;
+    }
+
+    wist_ast_type_destroy(comp, expr->type);
+    WIST_CTX_FREE(comp->ctx, expr, struct wist_ast_expr);
+}
+
+/* === PRIVATES === */
+
+
+static void wist_ast_type_destroy(struct wist_compiler *comp,
+        struct wist_ast_type *type) {
+    switch (type->t) {
+        case WIST_AST_TYPE_FUN:
+            wist_ast_type_destroy(comp, type->fun.in);
+            wist_ast_type_destroy(comp, type->fun.out);
+            break;
+        case WIST_AST_TYPE_INT:
+        case WIST_AST_TYPE_GEN:
+            break;
+        case WIST_AST_TYPE_VAR:
+            return; /* These are not allocated with the rest of the types. */
+    }
+
+}
+
+static void wist_ast_scope_destroy(struct wist_compiler *comp, 
+        struct wist_ast_scope *scope) {
+    struct wist_ast_var_entry *var = scope->vars, *follow = NULL; 
+    while (var != NULL)
+    {
+        follow = var;
+        var = var->next;
+        WIST_CTX_FREE(comp->ctx, follow, struct wist_ast_var_entry);
+    }
+
+    WIST_CTX_FREE(comp->ctx, scope, struct wist_ast_scope);
+}
 
 static struct wist_ast_expr *wist_ast_create_expr(struct wist_compiler *comp,
         enum wist_ast_expr_kind t, struct wist_srcloc loc) {
@@ -144,7 +210,7 @@ static struct wist_ast_expr *wist_ast_create_expr(struct wist_compiler *comp,
 
 static struct wist_ast_type *wist_ast_create_type(struct wist_compiler *comp, 
         enum wist_ast_type_kind t) {
-    struct wist_ast_type *type = WIST_CTX_NEW(comp->ctx, struct wist_ast_type);
+    struct wist_ast_type *type = WIST_OBJPOOL_ALLOC(&comp->type_pool, struct wist_ast_type);
     type->t = t;
     return type;
 }
@@ -177,8 +243,8 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
             printf(" : '%.*s'", (int) expr->var.sym->str_len, (const char *) 
                     expr->var.sym->str);
             break;
-        case WIST_AST_EXPR_INT_LIT:
-            printf(" : %" PRId64, expr->int_lit.val);
+        case WIST_AST_EXPR_INT:
+            printf(" : %" PRId64, expr->i.val);
             break;
     }
 
@@ -212,7 +278,10 @@ static void wist_ast_print_type_indent(struct wist_compiler *comp,
             printf("\n");
             wist_ast_print_type_indent(comp, type->fun.out, indent + 1);
             break;
-        case WIST_AST_TYPE_BUILTIN_INT:
+        case WIST_AST_TYPE_GEN:
+            printf(" : '%c", (char) ('a' + type->gen.id));
+            break;
+        case WIST_AST_TYPE_INT:
             break;
     }
 }
