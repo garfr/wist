@@ -81,7 +81,7 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 #define WIST_VECTOR_PUSH(_ctx, _vec, _type, _item)                             \
     wist_vector_push(_ctx, _vec, sizeof(_type), _item)
 #define WIST_VECTOR_PUSH_UNINIT(_ctx, _vec, _type)                             \
-    wist_vector_push_uninit(_ctx, _vec, sizeof(_type))
+    ((_type *) wist_vector_push_uninit(_ctx, _vec, sizeof(_type)))
 #define WIST_VECTOR_INDEX(_vec, _type, _idx)                                   \
     ((_type *) wist_vector_index(_vec, sizeof(_type), _idx))
 
@@ -89,7 +89,7 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 
 #define WIST_VECTOR_FIX_SIZE(_ctx, _vec) wist_vector_fix_size(_ctx, _vec)
 
-#define WIST_VECTOR_LEN(_vec, _type) ((_vec)->data_alloc / sizeof(_type))
+#define WIST_VECTOR_LEN(_vec, _type) ((_vec)->data_used / sizeof(_type))
 #define WIST_VECTOR_DATA(_vec, _type) ((_type *) ((_vec)->data))
 
 #define WIST_VECTOR_FOR_EACH(_vec, _type, _var)                                \

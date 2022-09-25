@@ -319,6 +319,7 @@ static void type_var_renamer_init(struct wist_compiler *comp,
         struct type_var_renamer *renamer) {
     if (comp->next_type_id == 0) {
         /* We will never call type_var_rename because there are no type vars. */
+        renamer->bindings = NULL;
         return; 
     }
     renamer->bindings = WIST_CTX_NEW_ARR(comp->ctx, uint64_t, comp->next_type_id);

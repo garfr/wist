@@ -87,7 +87,7 @@ struct wist_ast_expr {
          } app;
 
          struct {
-             int64_t val;
+             int64_t val; /* TODO: Use a bigint to store data larger than integers can. */
          } i;
     };
 };
