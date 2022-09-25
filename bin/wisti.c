@@ -23,7 +23,7 @@ int main()
 
     struct wist_vm *vm = wist_vm_create(ctx);
 
-    const char src[] = "(\\f -> (\\x -> f (f x)))";
+    const char src[] = "42";
 
     struct wist_ast_expr *expr;
 
@@ -35,8 +35,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    struct wist_vm_handle *val = wist_compiler_vm_gen_expr(comp, vm, expr);
-    (void) val; /* TODO: Execute val. */
+    struct wist_handle *val = wist_compiler_vm_gen_expr(comp, vm, expr);
+
+    struct wist_handle *computed = wist_vm_eval(vm, val);
+
+    printf("%d\n", wist_handle_get_type(computed));
 
     wist_parse_result_destroy(comp, result);
     wist_ast_expr_destroy(comp, expr);

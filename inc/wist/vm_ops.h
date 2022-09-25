@@ -1,0 +1,11 @@
+/* === inc/wist/vm_ops.h - VM opcodes === 
+ * Copyright (C) 2022 Gavin Ratcliff - All Rights Reserved
+ * Part of the Wist reference implementation, under the MIT license.
+ * See LICENSE.txt for license information.
+*/
+
+/* There is no include guard, because this is meant to be used to generate code. */
+
+OPCODE(INT64, 8)
+OPCODE(RETURN, 0)
+OPCODE(CLOSURE, 2)
