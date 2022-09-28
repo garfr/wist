@@ -8,6 +8,7 @@
 #define _WIST_DIAG_H
 
 #include <wist/lexer.h>
+#include <wist/ast.h>
 
 /* 
  * Each diagnostic kind has a correct number of important source locations 
@@ -17,6 +18,7 @@ enum wist_diag_kind {
     WIST_DIAG_UNEXPECTED_CHAR,
     WIST_DIAG_EXPECTED_EXPR,
     WIST_DIAG_EXPECTED_TOKEN,
+    WIST_DIAG_TYPE_MISMATCH,
 };
 
 enum wist_diag_level {
@@ -33,6 +35,9 @@ struct wist_diag {
 
     union {
         enum wist_token_kind expected_token;
+        struct {
+            struct wist_ast_type *t1, *t2;
+        } type_mismatch;
     };
 };
 

@@ -29,6 +29,7 @@ struct wist_compiler {
     struct wist_objpool type_var_pool; 
     /* All other types. */
     struct wist_objpool type_pool;
+    struct wist_ast_expr *cur_expr; /* Maintained during sema. */
 };
 
 struct wist_parse_result {

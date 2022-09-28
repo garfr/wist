@@ -131,6 +131,7 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             struct wist_ast_type *arg_type = infer_expr_rec(comp, scope,
                     expr->app.arg, non_generics);
             struct wist_ast_type *ret_type = wist_ast_create_var_type(comp);
+            comp->cur_expr = expr;
             unify(comp, wist_ast_create_fun_type(comp, arg_type, ret_type), fun_type);
             expr->type = ret_type;
             break;
@@ -259,6 +260,11 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
     } 
     if (t1->t != t2->t) {
         printf("type mismatch!\n");
+        struct wist_diag *diag = wist_compiler_add_diag(comp, 
+                WIST_DIAG_TYPE_MISMATCH, WIST_DIAG_ERROR);
+        wist_diag_add_loc(comp, diag, comp->cur_expr->loc);
+        diag->type_mismatch.t1 = t1;
+        diag->type_mismatch.t2 = t2;
         return;
     }
     switch (t1->t) {
