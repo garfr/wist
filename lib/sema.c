@@ -45,6 +45,8 @@ struct type_var_renamer {
 
 /* === PROTOTYPES === */
 
+static bool occurs_in_type(struct wist_compiler *comp, struct wist_ast_type *t1,
+        struct wist_ast_type *_t2);
 static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
         struct wist_ast_scope *scope, struct wist_ast_expr *expr, 
         struct type_chain *non_generics);
@@ -59,6 +61,7 @@ static struct wist_ast_type *prune(struct wist_compiler *comp,
         struct wist_ast_type *type);
 static void unify(struct wist_compiler *comp, struct wist_ast_type *t1, 
         struct wist_ast_type *t2);
+static bool type_eq(struct wist_ast_type *t1, struct wist_ast_type *t2);
 
 /* Repairs and cleanup for our post-inference AST. */
 static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
@@ -147,6 +150,22 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
     }
     return expr->type;
 };
+
+static bool occurs_in_type(struct wist_compiler *comp, struct wist_ast_type *t1,
+        struct wist_ast_type *_t2) {
+    struct wist_ast_type *t2 = prune(comp, _t2);
+
+    if (type_eq(t1, t2)) {
+        return true;
+    }
+
+    if (t2->t == WIST_AST_TYPE_FUN) {
+        return occurs_in_type(comp, t1, t2->fun.in) 
+            || occurs_in_type(comp, t1, t2->fun.out);
+    }
+
+    return false;
+}
 
 static struct wist_ast_type *fresh_type(struct wist_compiler *comp, 
         struct wist_ast_type *type, struct type_chain *non_generics) {
@@ -252,6 +271,13 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
     struct wist_ast_type *t2 = prune(comp, _t2);
     if (t1->t == WIST_AST_TYPE_VAR) {
         if (!type_eq(t1, t2)) {
+            if (occurs_in_type(comp, t1, t2)) {
+                struct wist_diag *diag = wist_compiler_add_diag(comp, 
+                        WIST_DIAG_RECURSIVE_TYPE, WIST_DIAG_ERROR);
+                wist_diag_add_loc(comp, diag, comp->cur_expr->loc);
+                diag->recursive_type.main = t1;
+                diag->recursive_type.recursive = t2;
+            }
             t1->var.instance = t2;
         }
         return;
@@ -259,7 +285,6 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
         return unify(comp, t2, t1);
     } 
     if (t1->t != t2->t) {
-        printf("type mismatch!\n");
         struct wist_diag *diag = wist_compiler_add_diag(comp, 
                 WIST_DIAG_TYPE_MISMATCH, WIST_DIAG_ERROR);
         wist_diag_add_loc(comp, diag, comp->cur_expr->loc);

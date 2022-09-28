@@ -19,6 +19,7 @@ enum wist_diag_kind {
     WIST_DIAG_EXPECTED_EXPR,
     WIST_DIAG_EXPECTED_TOKEN,
     WIST_DIAG_TYPE_MISMATCH,
+    WIST_DIAG_RECURSIVE_TYPE,
 };
 
 enum wist_diag_level {
@@ -38,6 +39,9 @@ struct wist_diag {
         struct {
             struct wist_ast_type *t1, *t2;
         } type_mismatch;
+        struct {
+            struct wist_ast_type *main, *recursive;
+        } recursive_type;
     };
 };
 
