@@ -11,3 +11,7 @@
 enum wist_obj_type wist_handle_get_type(struct wist_handle *handle) {
     return (enum wist_obj_type) handle->obj.t;
 }
+
+int64_t wist_handle_get_int(struct wist_handle *handle) {
+    return handle->obj.i;
+}

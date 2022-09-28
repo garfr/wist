@@ -56,6 +56,15 @@ struct wist_vm;
  * A handle to a specific value in the VM.  These can be global or put on a 
  * "handle stack".
  */
+/* Creates a new VM from a given context. */
+struct wist_vm *wist_vm_create(struct wist_ctx *ctx);
+
+/* Destroys a VM freeing ALL resources allocated to it. */
+void wist_vm_destroy(struct wist_vm *vm);
+
+/* Evaluates a closure and returns the final value. */
+struct wist_handle *wist_vm_eval(struct wist_vm *vm, struct wist_handle *closure);
+
 struct wist_handle;
 
 enum wist_obj_type {
@@ -64,15 +73,7 @@ enum wist_obj_type {
 };
 
 enum wist_obj_type wist_handle_get_type(struct wist_handle *handle);
-
-/* Creates a new VM from a given context. */
-struct wist_vm *wist_vm_create(struct wist_ctx *ctx);
-
-/* Evaluates a closure and returns the final value. */
-struct wist_handle *wist_vm_eval(struct wist_vm *vm, struct wist_handle *closure);
-
-/* Destroys a VM freeing ALL resources allocated to it. */
-void wist_vm_destroy(struct wist_vm *vm);
+int64_t wist_handle_get_int(struct wist_handle *handle);
 
 /* === AST === */
 
