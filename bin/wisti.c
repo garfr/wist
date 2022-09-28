@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 int main()
 {
@@ -23,7 +24,7 @@ int main()
 
     struct wist_vm *vm = wist_vm_create(ctx);
 
-    const char src[] = "42";
+    const char src[] = "(\\f -> (\\x -> f x)) (\\x -> x) 3";
 
     struct wist_ast_expr *expr;
 
@@ -39,7 +40,7 @@ int main()
 
     struct wist_handle *computed = wist_vm_eval(vm, val);
 
-    printf("%d\n", wist_handle_get_type(computed));
+    printf("%d %" PRId64 "\n", wist_handle_get_type(computed), wist_handle_get_int(computed));
 
     wist_parse_result_destroy(comp, result);
     wist_ast_expr_destroy(comp, expr);

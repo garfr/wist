@@ -39,3 +39,7 @@ void wist_vm_obj_print_closure(struct wist_vm_closure *clo) {
         }
     }
 }
+
+void wist_vm_obj_print_op(uint8_t op) {
+        printf("%s\n", vm_op_to_string[op]);
+}

@@ -53,7 +53,7 @@ static void wist_vector_finish(struct wist_ctx *ctx, struct wist_vector *vec) {
 static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec);
 
 static void *wist_vector_index(struct wist_vector *vec, size_t item_size, size_t idx) {
-    return vec->data + (idx + item_size);
+    return vec->data + (idx * item_size);
 
     (void) wist_vector_fix_size;
 }

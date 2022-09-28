@@ -3,7 +3,7 @@ LIBDIR= lib
 BINDIR= bin
 INCDIR= inc
 
-CFLAGS= -g -Wall -Wextra -I$(INCDIR) -I. -std=c99 -fno-strict-aliasing
+CFLAGS= -g -O0 -Wall -Wextra -I$(INCDIR) -I. -std=c99 -fno-strict-aliasing
 LIB_CFLAGS=$(CFLAGS)
 
 REPL_TARGET= $(BUILDDIR)/wisti

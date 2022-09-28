@@ -38,7 +38,8 @@ struct wist_vm_obj {
 
 struct wist_vm_env {
     struct wist_vm_gc_hdr hdr;
-    struct wist_vm_obj *items;
+    struct wist_vm_obj val;
+    struct wist_vm_obj next;
 };
 
 struct wist_vm_closure {
@@ -51,7 +52,9 @@ struct wist_vm_closure {
 #define WIST_VM_TO_GC_HDR(_ptr) (&(_ptr)->hdr)
 
 #define WIST_VM_GET_CLOSURE(_obj) ((struct wist_vm_closure *) (_obj).gc)
+#define WIST_VM_GET_ENV(_obj) ((struct wist_vm_env *) (_obj).gc)
 
 void wist_vm_obj_print_closure(struct wist_vm_closure *clo);
+void wist_vm_obj_print_op(uint8_t op);
 
 #endif /* _WIST_VM_OBJ_H */
