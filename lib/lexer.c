@@ -181,6 +181,8 @@ start:
             SKIP_C(lexer);
         }
 
+        BACKUP_C(lexer);
+
         if (neg) {
             total *= -1;
         }
