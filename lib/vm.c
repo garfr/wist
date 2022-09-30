@@ -15,8 +15,14 @@
 #define WIST_VM_ASP_MAX_SIZE 128
 
 struct return_frame {
-    struct wist_vm_obj env;
-    uint8_t *pc;
+    union {
+        struct {
+            struct wist_vm_obj env;
+            uint8_t *pc;
+            int extra_args;
+        } frame;
+        struct wist_vm_obj env;
+    };
 };
 
 struct wist_vm *wist_vm_create(struct wist_ctx *ctx) {
@@ -57,8 +63,10 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
     struct wist_vm_obj *asp = arg_stack;
     struct return_frame return_stack[WIST_VM_RSP_MAX_SIZE];
     struct return_frame *rsp = return_stack;
+    uint32_t extra_args = 0;
 
-    accum.t = env.t = WIST_VM_OBJ_UNDEFINED;
+    accum.t = WIST_VM_OBJ_UNDEFINED;
+    env = WIST_VM_GC_ALLOC(&vm->gc, 0, WIST_VM_OBJ_ENV);
 
     while (1) {
         switch (*pc++){
@@ -69,7 +77,17 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                             sizeof(struct wist_vm_obj)), WIST_VM_OBJ_CLO);
                 memcpy(&WIST_VM_OBJ_FIELD2(accum), pc, code_len);
                 pc += code_len;
-                WIST_VM_OBJ_FIELD1(accum) = env;
+                size_t env_count = extra_args + WIST_VM_OBJ_FIELD_COUNT(env);
+                struct wist_vm_obj full_env = WIST_VM_GC_ALLOC(&vm->gc, env_count, WIST_VM_OBJ_CLO);
+                for (size_t i = 0; i < extra_args; i++) {
+                    WIST_VM_OBJ_FIELD(full_env, i) = (--rsp)->env;
+                }
+                for (size_t i = 0; i < WIST_VM_OBJ_FIELD_COUNT(env); i++) {
+                    WIST_VM_OBJ_FIELD(full_env, i + extra_args) = WIST_VM_OBJ_FIELD(env, i);
+                }
+                WIST_VM_OBJ_FIELD1(accum) = full_env;
+                extra_args = 0;
+                env = full_env;
                 break;
             }
             case WIST_VM_OP_PUSH: {
@@ -83,24 +101,27 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
             }
             case WIST_VM_OP_APPLY: {
                 struct return_frame *frame = rsp++;
-                frame->pc = pc;
-                frame->env = env;
+                frame->frame.pc = pc;
+                frame->frame.env = env;
+                frame->frame.extra_args = extra_args;
+                extra_args = 1;
+                frame = rsp++;
+                frame->env = *(--asp);
                 env = WIST_VM_OBJ_FIELD1(accum);
                 pc = WIST_VM_OBJ_CLO_PC(accum);
-                struct wist_vm_obj new_env = WIST_VM_GC_ALLOC(&vm->gc, 
-                        2, WIST_VM_OBJ_ENV);
-                WIST_VM_OBJ_FIELD1(new_env) = *(--asp);
-                WIST_VM_OBJ_FIELD2(new_env) = env;
-                env = new_env;
                 break;
             }
             case WIST_VM_OP_ACCESS: {
                 uint8_t idx = *pc++;
-                struct wist_vm_obj iter = env;
-                for (uint8_t i = 0; i < idx; i++) {
-                    iter = WIST_VM_OBJ_FIELD2(iter);
+                if (idx < extra_args) {
+                    accum = (rsp - (1 + idx))->env;
+                } else {
+                    struct wist_vm_obj iter = env;
+                    for (uint8_t i = extra_args; i < idx; i++) {
+                        iter = WIST_VM_OBJ_FIELD2(iter);
+                    }
+                    accum = WIST_VM_OBJ_FIELD1(iter);
                 }
-                accum = WIST_VM_OBJ_FIELD1(iter);
                 break;
             }
             case WIST_VM_OP_INT64: {
@@ -123,17 +144,18 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                     return accum;
                 } else {
                     if ((asp - 1)->t == WIST_VM_OBJ_MARK) {
-                        asp--;
+                        rsp -= extra_args; /* Drop all the extra args on the return stack. */
+                        asp--; /* Move past the mark. */
                         rsp--;
-                        pc = rsp->pc;
-                        env = rsp->env;
+                        pc = rsp->frame.pc;
+                        env = rsp->frame.env;
+                        extra_args = rsp->frame.extra_args;
                     } else {
-                        struct wist_vm_obj new_env = WIST_VM_GC_ALLOC(&vm->gc, 
-                                2, WIST_VM_OBJ_ENV);
-                        WIST_VM_OBJ_FIELD1(new_env) = *(--asp);
-                        WIST_VM_OBJ_FIELD2(new_env) = WIST_VM_OBJ_FIELD1(accum);
-                        env = new_env;
+                        rsp -= (extra_args);
+                        (rsp + 1)->env = *(--asp);
+                        env = WIST_VM_OBJ_FIELD1(accum);
                         pc = WIST_VM_OBJ_CLO_PC(accum);
+                        extra_args = 1;
                     }
                     break;
                 };

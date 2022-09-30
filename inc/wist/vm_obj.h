@@ -54,5 +54,6 @@ void wist_vm_obj_print_clo(struct wist_vm_obj clo);
 #define WIST_VM_OBJ_FIELD1(_obj) ((_obj).gc->fields[0])
 #define WIST_VM_OBJ_FIELD2(_obj) ((_obj).gc->fields[1])
 #define WIST_VM_OBJ_FIELD(_obj, _n) ((_obj).gc->fields[_n])
+#define WIST_VM_OBJ_FIELD_COUNT(_obj) ((_obj).gc->field_count)
 
 #endif /* _WIST_VM_OBJ_H */

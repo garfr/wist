@@ -24,8 +24,7 @@ int main()
 
     struct wist_vm *vm = wist_vm_create(ctx);
 
-//    const char src[] = "(\\x -> x) (3, 4)";
-    const char src[] = "(\\x -> (\\y -> (\\z -> z))) 3 2 1";
+    const char src[] = "(\\x -> x) 3";
 
     struct wist_ast_expr *expr;
 
