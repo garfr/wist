@@ -62,6 +62,7 @@ void wist_vm_obj_print_clo(struct wist_vm_obj clo) {
                 clo_count--;
                 break;
             case WIST_VM_OP_PUSH:
+            case WIST_VM_OP_PUSHMARK:
             case WIST_VM_OP_APPLY:
                 break;
         }

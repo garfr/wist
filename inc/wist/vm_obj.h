@@ -25,6 +25,7 @@ enum wist_vm_obj_kind {
 
     /* These are internal types the user won't (shouldn't) see. */
     WIST_VM_OBJ_ENV,
+    WIST_VM_OBJ_MARK,
 
     /* Used when values have not been initialized for debugging. */
     WIST_VM_OBJ_UNDEFINED, 

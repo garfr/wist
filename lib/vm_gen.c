@@ -64,6 +64,8 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
 
     wist_lir_expr_destroy(comp, lir_expr);
 
+    wist_vm_obj_print_clo(clo);
+
     struct wist_handle *handle = wist_vm_add_handle(vm);
     handle->obj = clo;
 
@@ -155,9 +157,14 @@ static void gen_expr_rec(struct code_builder *builder,
             break;
         }
         case WIST_LIR_EXPR_APP: {
-            gen_expr_rec(builder, expr->app.arg);
-            code_builder_add_8(builder, WIST_VM_OP_PUSH);
-            gen_expr_rec(builder, expr->app.fun);
+            code_builder_add_8(builder, WIST_VM_OP_PUSHMARK);
+            struct wist_lir_expr *fun = expr;
+            while (fun->t == WIST_LIR_EXPR_APP) {
+                gen_expr_rec(builder, fun->app.arg);
+                code_builder_add_8(builder, WIST_VM_OP_PUSH);
+                fun = fun->app.fun;
+            }
+            gen_expr_rec(builder, fun);
             code_builder_add_8(builder, WIST_VM_OP_APPLY);
             break;
         }

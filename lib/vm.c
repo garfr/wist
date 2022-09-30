@@ -76,6 +76,11 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                 *asp++ = accum;
                 break;
             }
+            case WIST_VM_OP_PUSHMARK: {
+                asp->t = WIST_VM_OBJ_MARK;
+                asp++;
+                break;
+            }
             case WIST_VM_OP_APPLY: {
                 struct return_frame *frame = rsp++;
                 frame->pc = pc;
@@ -117,13 +122,23 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                 if (rsp == return_stack) {
                     return accum;
                 } else {
-                    rsp--;
-                    pc = rsp->pc;
-                    env = rsp->env;
+                    if ((asp - 1)->t == WIST_VM_OBJ_MARK) {
+                        asp--;
+                        rsp--;
+                        pc = rsp->pc;
+                        env = rsp->env;
+                    } else {
+                        struct wist_vm_obj new_env = WIST_VM_GC_ALLOC(&vm->gc, 
+                                2, WIST_VM_OBJ_ENV);
+                        WIST_VM_OBJ_FIELD1(new_env) = *(--asp);
+                        WIST_VM_OBJ_FIELD2(new_env) = WIST_VM_OBJ_FIELD1(accum);
+                        env = new_env;
+                        pc = WIST_VM_OBJ_CLO_PC(accum);
+                    }
                     break;
                 };
             default:
-                printf("unimplemented op case in wist_vm_interpret\n");
+                printf("unimplemented op case in wist_vm_interpret : %d\n", *(pc - 1));
                 break;
         }
     }
