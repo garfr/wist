@@ -9,12 +9,18 @@
 
 #include <wist.h>
 #include <wist/defs.h>
+#include <wist/vector.h>
 
 enum wist_lir_expr_kind {
     WIST_LIR_EXPR_LAM,
     WIST_LIR_EXPR_APP,
     WIST_LIR_EXPR_VAR,
     WIST_LIR_EXPR_INT,
+    WIST_LIR_EXPR_MKB,
+};
+
+enum wist_lir_block_kind {
+    WIST_LIR_BLOCK_TUPLE,
 };
 
 struct wist_lir_expr {
@@ -34,6 +40,11 @@ struct wist_lir_expr {
         } var;
 
         struct {
+            enum wist_lir_block_kind t;
+            struct wist_vector fields; /* struct wist_lir_expr * */
+        } mkb;
+
+        struct {
             int64_t val;
         } i;
     };
@@ -50,6 +61,8 @@ struct wist_lir_expr *wist_lir_create_lam(struct wist_compiler *comp,
         struct wist_lir_expr *body);
 struct wist_lir_expr *wist_lir_create_var(struct wist_compiler *comp,
         struct wist_lir_expr *origin);
+struct wist_lir_expr *wist_lir_create_mkb(struct wist_compiler *comp,
+        enum wist_lir_block_kind t, struct wist_vector mkb);
 struct wist_lir_expr *wist_lir_create_int(struct wist_compiler *comp, 
         int64_t i);
 

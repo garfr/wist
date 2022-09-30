@@ -45,14 +45,13 @@ struct wist_handle *wist_vm_eval(struct wist_vm *vm,
 }
 
 struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm, 
-        struct wist_vm_obj closure) {
+        struct wist_vm_obj clo) {
     IGNORE(vm);
 
-    struct wist_vm_obj accum, env;
+    struct wist_vm_obj accum, env = WIST_VM_OBJ_FIELD1(clo);
     uint8_t *pc;
 
-    struct wist_vm_closure *real_closure = WIST_VM_GET_CLOSURE(closure);
-    pc = real_closure->code;
+    pc = WIST_VM_OBJ_CLO_PC(clo);
 
     struct wist_vm_obj arg_stack[WIST_VM_ASP_MAX_SIZE];
     struct wist_vm_obj *asp = arg_stack;
@@ -62,20 +61,15 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
     accum.t = env.t = WIST_VM_OBJ_UNDEFINED;
 
     while (1) {
-        wist_vm_obj_print_op(*pc);
         switch (*pc++){
             case WIST_VM_OP_CLOSURE: {
                 uint16_t code_len = *((uint16_t *) pc);
                 pc += 2;
-                struct wist_vm_closure *closure = 
-                    WIST_VM_GC_ALLOC(&vm->gc, struct wist_vm_closure);
-                closure->code = WIST_CTX_NEW_ARR(vm->ctx, uint8_t, code_len);
-                closure->code_len = code_len;
-                memcpy(closure->code, pc, code_len);
+                accum = WIST_VM_GC_ALLOC(&vm->gc, 2 + (code_len / 
+                            sizeof(struct wist_vm_obj)), WIST_VM_OBJ_CLO);
+                memcpy(&WIST_VM_OBJ_FIELD2(accum), pc, code_len);
                 pc += code_len;
-                closure->env = env;
-                accum.t = WIST_VM_OBJ_CLO;
-                accum.gc = WIST_VM_TO_GC_HDR(closure);
+                WIST_VM_OBJ_FIELD1(accum) = env;
                 break;
             }
             case WIST_VM_OP_PUSH: {
@@ -86,29 +80,37 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                 struct return_frame *frame = rsp++;
                 frame->pc = pc;
                 frame->env = env;
-                env = WIST_VM_GET_CLOSURE(accum)->env;
-                pc = WIST_VM_GET_CLOSURE(accum)->code;
-                struct wist_vm_env *new_env = WIST_VM_GC_ALLOC(&vm->gc, 
-                        struct wist_vm_env);
-                new_env->val = *(--asp);
-                new_env->next = env;
-                env.gc = WIST_VM_TO_GC_HDR(new_env);
-                env.t = WIST_VM_OBJ_ENV;
+                env = WIST_VM_OBJ_FIELD1(accum);
+                pc = WIST_VM_OBJ_CLO_PC(accum);
+                struct wist_vm_obj new_env = WIST_VM_GC_ALLOC(&vm->gc, 
+                        2, WIST_VM_OBJ_ENV);
+                WIST_VM_OBJ_FIELD1(new_env) = *(--asp);
+                WIST_VM_OBJ_FIELD2(new_env) = env;
+                env = new_env;
                 break;
             }
             case WIST_VM_OP_ACCESS: {
                 uint8_t idx = *pc++;
                 struct wist_vm_obj iter = env;
                 for (uint8_t i = 0; i < idx; i++) {
-                    iter = WIST_VM_GET_ENV(iter)->next;
+                    iter = WIST_VM_OBJ_FIELD2(iter);
                 }
-                accum = WIST_VM_GET_ENV(iter)->val;
+                accum = WIST_VM_OBJ_FIELD1(iter);
                 break;
             }
             case WIST_VM_OP_INT64: {
                 accum.t = WIST_VM_OBJ_INT;
                 accum.i =  *((int64_t*) pc);;
                 pc += 8;
+                break;
+            }
+            case WIST_VM_OP_MKB: {
+                uint16_t field_count = *((uint16_t *) pc);
+                pc += 2;
+                accum = WIST_VM_GC_ALLOC(&vm->gc, field_count, WIST_VM_OBJ_TUPLE);
+                for (int i = field_count - 1; i >= 0; i--) {
+                    WIST_VM_OBJ_FIELD(accum, i) = *(--asp);
+                }
                 break;
             }
             case WIST_VM_OP_RETURN: 

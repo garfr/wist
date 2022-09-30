@@ -93,8 +93,8 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 #define WIST_VECTOR_DATA(_vec, _type) ((_type *) ((_vec)->data))
 
 #define WIST_VECTOR_FOR_EACH(_vec, _type, _var)                                \
-    for (_type *_var = ((_type *) (_vec)->data);                               \
-         ((uint8_t *) _var) < ((_vec)->data + (_vec)->data_used);              \
-         _var = (_type *) ((uint8_t *) _var) + sizeof(_type))
+    for (_type *_var = (_type *) (_vec)->data;                                      \
+            ((uint8_t *) _var) < ((_vec)->data + (_vec)->data_used);                    \
+            _var = (_type *) (((uint8_t *) _var) + sizeof(_type)))                    
 
 #endif /* _WIST_VECTOR_H */

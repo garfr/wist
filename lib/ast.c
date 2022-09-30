@@ -15,12 +15,14 @@ const char *ast_expr_to_string_map[] = {
     [WIST_AST_EXPR_APP] = "Application",
     [WIST_AST_EXPR_VAR] = "Variable",
     [WIST_AST_EXPR_INT] = "Integer",
+    [WIST_AST_EXPR_TUPLE] = "Tuple",
 };
 
 const char *ast_type_to_string_map[] = {
     [WIST_AST_TYPE_FUN] = "Function",
     [WIST_AST_TYPE_VAR] = "Variable",
     [WIST_AST_TYPE_GEN] = "Generic",
+    [WIST_AST_TYPE_TUPLE] = "Tuple",
     [WIST_AST_TYPE_INT] = "Integer",
 };
 
@@ -76,11 +78,25 @@ struct wist_ast_expr *wist_ast_create_int(struct wist_compiler *comp,
     return expr;
 }
 
+struct wist_ast_expr *wist_ast_create_tuple(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_vector fields) {
+    struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_TUPLE, loc);
+    expr->tuple.fields = fields;
+    return expr;
+}
+
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out) {
     struct wist_ast_type *type = wist_ast_create_type(comp, WIST_AST_TYPE_FUN);
     type->fun.in = in;
     type->fun.out = out;
+    return type;
+}
+
+struct wist_ast_type *wist_ast_create_tuple_type(struct wist_compiler *comp, 
+        struct wist_vector fields) {
+    struct wist_ast_type *type = wist_ast_create_type(comp, WIST_AST_TYPE_TUPLE);
+    type->tuple.fields = fields;
     return type;
 }
 
@@ -159,6 +175,14 @@ void wist_ast_expr_destroy(struct wist_compiler *comp,
             wist_ast_expr_destroy(comp, expr->app.fun);
             wist_ast_expr_destroy(comp, expr->app.arg);
             break;
+        case WIST_AST_EXPR_TUPLE: {
+            WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, 
+                    field) {
+                wist_ast_expr_destroy(comp, *field);
+            }
+            WIST_VECTOR_FINISH(comp->ctx, &expr->tuple.fields);
+            break;
+        }
         case WIST_AST_EXPR_VAR:
         case WIST_AST_EXPR_INT:
             break;
@@ -177,6 +201,13 @@ static void wist_ast_type_destroy(struct wist_compiler *comp,
         case WIST_AST_TYPE_FUN:
             wist_ast_type_destroy(comp, type->fun.in);
             wist_ast_type_destroy(comp, type->fun.out);
+            break;
+        case WIST_AST_TYPE_TUPLE:
+            WIST_VECTOR_FOR_EACH(&type->tuple.fields, struct wist_ast_type *, 
+                    field) {
+                wist_ast_type_destroy(comp, *field);
+            }
+            WIST_VECTOR_FINISH(comp->ctx, &type->tuple.fields);
             break;
         case WIST_AST_TYPE_INT:
         case WIST_AST_TYPE_GEN:
@@ -246,13 +277,19 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
         case WIST_AST_EXPR_INT:
             printf(" : %" PRId64, expr->i.val);
             break;
+        case WIST_AST_EXPR_TUPLE: {
+            WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, field) {
+                printf("\n");
+                wist_ast_print_expr_indent(comp, *field, indent + 1);
+            }
+        }
     }
 
     if (expr->type != NULL) {
         printf("\n");
         wist_ast_print_type_indent(comp, expr->type, indent + 1);
     } else {
-        printf("\n\nEXPR HAS NULL TYPE\n\n");
+        //printf("\n\nEXPR HAS NULL TYPE\n\n");
     }
 }
 
@@ -278,6 +315,15 @@ static void wist_ast_print_type_indent(struct wist_compiler *comp,
             printf("\n");
             wist_ast_print_type_indent(comp, type->fun.out, indent + 1);
             break;
+        case WIST_AST_TYPE_TUPLE: {
+            printf(" : ");
+            WIST_VECTOR_FOR_EACH(&type->tuple.fields, struct wist_ast_type *, 
+                    field) {
+                printf("\n");
+                wist_ast_print_type_indent(comp, *field, indent + 1);
+            }
+            break;
+        }
         case WIST_AST_TYPE_GEN:
             printf(" : '%c", (char) ('a' + type->gen.id));
             break;

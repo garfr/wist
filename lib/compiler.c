@@ -11,6 +11,8 @@
 #include <wist/ast.h>
 #include <wist/sema.h>
 
+#include <stdio.h>
+
 /* === PROTOTYPES === */
 
 /* === PUBLICS === */
@@ -66,6 +68,13 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
     wist_sema_infer_expr(comp, comp->globals, expr);
 
     wist_ast_print_expr(comp, expr);
+
+    if (wist_parse_result_has_errors(result)) {
+        WIST_VECTOR_FOR_EACH(&result->diags, struct wist_diag, diag) {
+            wist_token_print(comp, diag->expected_expr);
+            printf("%d\n", diag->t);
+        }
+    }
 
     *expr_out = expr;
 

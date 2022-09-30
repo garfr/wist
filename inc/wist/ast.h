@@ -10,6 +10,7 @@
 #include <wist.h>
 #include <wist/srcloc.h>
 #include <wist/sym.h>
+#include <wist/vector.h>
 
 struct wist_ast_var_entry {
     struct wist_sym *sym;
@@ -24,6 +25,7 @@ struct wist_ast_scope {
 
 enum wist_ast_type_kind {
     WIST_AST_TYPE_FUN,
+    WIST_AST_TYPE_TUPLE,
     WIST_AST_TYPE_INT,
     WIST_AST_TYPE_GEN,
 
@@ -51,6 +53,10 @@ struct wist_ast_type {
         struct {
             uint64_t id;
         } gen;
+
+        struct {
+            struct wist_vector fields; /* struct wist_ast_type * */
+        } tuple;
     };
 };
 
@@ -59,6 +65,7 @@ enum wist_ast_expr_kind {
     WIST_AST_EXPR_VAR,
     WIST_AST_EXPR_APP,
     WIST_AST_EXPR_INT,
+    WIST_AST_EXPR_TUPLE,
 };
 
 struct wist_ast_expr {
@@ -89,6 +96,10 @@ struct wist_ast_expr {
          struct {
              int64_t val; /* TODO: Use a bigint to store data larger than integers can. */
          } i;
+
+         struct {
+             struct wist_vector fields; /* struct wist_ast_expr * */
+         } tuple;
     };
 };
 
@@ -108,9 +119,14 @@ struct wist_ast_expr *wist_ast_create_var(struct wist_compiler *comp,
 struct wist_ast_expr *wist_ast_create_int(struct wist_compiler *comp, 
         struct wist_srcloc loc, int64_t i);
 
+struct wist_ast_expr *wist_ast_create_tuple(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_vector fields);
+
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out);
 struct wist_ast_type *wist_ast_create_var_type(struct wist_compiler *comp);
+struct wist_ast_type *wist_ast_create_tuple_type(struct wist_compiler *comp, 
+        struct wist_vector fields);
 struct wist_ast_type *wist_ast_create_gen_type(struct wist_compiler *comp, 
         uint64_t id);
 struct wist_ast_type *wist_ast_create_int_type(struct wist_compiler *comp);

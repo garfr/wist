@@ -33,6 +33,7 @@ static void code_builder_init(struct wist_ctx *ctx,
         struct code_builder *builder);
 
 static void code_builder_add_8(struct code_builder *builder, uint8_t byte);
+static void code_builder_add_16(struct code_builder *builder, uint16_t u16);
 static void code_builder_add_64(struct code_builder *builder, uint64_t u64);
 static size_t code_builder_count(struct code_builder *builder);
 static size_t code_builder_add_16_uninit(struct code_builder *builder);
@@ -55,18 +56,16 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
 
     code_builder_add_8(&builder, WIST_VM_OP_RETURN);
 
-    struct wist_vm_closure *closure = WIST_VM_GC_ALLOC(&vm->gc, 
-            struct wist_vm_closure);
-    closure->code = WIST_VECTOR_DATA(&builder.code, uint8_t);
-    closure->code_len = WIST_VECTOR_LEN(&builder.code, uint8_t);
-    closure->env.t = WIST_VM_OBJ_UNDEFINED;
+    struct wist_vm_obj clo = WIST_VM_GC_ALLOC(&vm->gc, 2 + 
+            (WIST_VECTOR_LEN(&builder.code, uint8_t) 
+           / sizeof(struct wist_vm_obj)), WIST_VM_OBJ_CLO);
+    memcpy(WIST_VM_OBJ_CLO_PC(clo), WIST_VECTOR_DATA(&builder.code, uint8_t), 
+            WIST_VECTOR_LEN(&builder.code, uint8_t));
 
-    wist_vm_obj_print_closure(closure);
     wist_lir_expr_destroy(comp, lir_expr);
 
     struct wist_handle *handle = wist_vm_add_handle(vm);
-    handle->obj.t = WIST_VM_OBJ_CLO;
-    handle->obj.gc = WIST_VM_TO_GC_HDR(closure);
+    handle->obj = clo;
 
     return handle;
 }
@@ -82,6 +81,12 @@ static void code_builder_init(struct wist_ctx *ctx,
 
 static void code_builder_add_8(struct code_builder *builder, uint8_t byte) {
     WIST_VECTOR_PUSH(builder->ctx, &builder->code, uint8_t, &byte);
+}
+
+static void code_builder_add_16(struct code_builder *builder, uint16_t _u16) {
+    uint8_t *u16 = (uint8_t *) &_u16;
+    code_builder_add_8(builder, u16[0]);
+    code_builder_add_8(builder, u16[1]);
 }
 
 static void code_builder_add_64(struct code_builder *builder, uint64_t _u64) {
@@ -102,8 +107,8 @@ static size_t code_builder_count(struct code_builder *builder) {
 
 static size_t code_builder_add_16_uninit(struct code_builder *builder) {
     size_t idx = WIST_VECTOR_LEN(&builder->code, uint8_t);
-    WIST_VECTOR_PUSH_UNINIT(builder->ctx, &builder->code, uint8_t);
-    WIST_VECTOR_PUSH_UNINIT(builder->ctx, &builder->code, uint8_t);
+    code_builder_add_8(builder, 0);
+    code_builder_add_8(builder, 0);
     return idx;
 }
 
@@ -129,16 +134,14 @@ static void gen_expr_rec(struct code_builder *builder,
             size_t closure_size_idx = code_builder_add_16_uninit(builder);
             size_t op_count_before = code_builder_count(builder);
 
-
             gen_expr_rec(builder, expr->lam.body);
 
             code_builder_add_8(builder, WIST_VM_OP_RETURN);
 
             size_t op_count_after = code_builder_count(builder);
-            uint8_t *closure_pos = 
+            uint16_t *closure_pos = (uint16_t *)
                 WIST_VECTOR_INDEX(&builder->code, uint8_t, closure_size_idx);
             uint16_t closure_sz = (uint16_t) (op_count_after - op_count_before);
-
             *closure_pos = closure_sz;
 
             map = builder->indices;
@@ -168,6 +171,16 @@ static void gen_expr_rec(struct code_builder *builder,
                 }
                 map = map->next;
             }
+            break;
+        }
+        case WIST_LIR_EXPR_MKB: {
+            WIST_VECTOR_FOR_EACH(&expr->mkb.fields, struct wist_lir_expr *, field) {
+                gen_expr_rec(builder, *field);
+                code_builder_add_8(builder, WIST_VM_OP_PUSH);
+            }
+            code_builder_add_8(builder, WIST_VM_OP_MKB);
+            code_builder_add_16(builder, 
+                    WIST_VECTOR_LEN(&expr->mkb.fields, struct wist_lir_expr *));
             break;
         }
         default: 

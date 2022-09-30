@@ -36,6 +36,7 @@ struct wist_diag {
 
     union {
         enum wist_token_kind expected_token;
+        struct wist_token expected_expr;
         struct {
             struct wist_ast_type *t1, *t2;
         } type_mismatch;

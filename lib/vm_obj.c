@@ -16,30 +16,64 @@ static const char *vm_op_to_string[] = {
 #undef OPCODE
 };
 
-void wist_vm_obj_print_closure(struct wist_vm_closure *clo) {
-    size_t i = 0;
-    while (i < clo->code_len)
-    {
-        printf("%s", vm_op_to_string[clo->code[i]]);
-        switch (clo->code[i++]) {
-#define OPCODE(name, size) case WIST_VM_OP_##name:                             \
-            switch (size) {                                                    \
-                case 0: printf("\n"); break;                                   \
-                case 1: printf(": %" PRIu8, *((uint8_t *) &clo->code[i]));     \
-                        i += 1; break;                                         \
-                case 2: printf(": %" PRIu16, *((uint16_t *) &clo->code[i]));   \
-                        i += 2; break;                                         \
-                case 4: printf(" : %" PRIu32, *((uint32_t *) &clo->code[i]));  \
-                        i += 4; break;                                         \
-                case 8: printf(": %" PRIu64, *((uint64_t *) &clo->code[i]));   \
-                        i += 8; break;                                         \
-            } if (size > 0) { printf(" (%d) \n", size); } break;
-#include <wist/vm_ops.h>
-#undef OPCODE
+void wist_vm_obj_print_op(uint8_t op) {
+        printf("%s\n", vm_op_to_string[op]);
+}
+
+void wist_vm_obj_print_clo(struct wist_vm_obj clo) {
+    int clo_count = 0;
+    uint8_t *pc = WIST_VM_OBJ_CLO_PC(clo);
+    uint8_t op;
+
+    while (1) {
+        op = *(pc++);
+        printf("%s", vm_op_to_string[op]);
+        switch (op) {
+            case WIST_VM_OP_INT64: {
+                uint64_t *val = (uint64_t *) pc;
+                pc += 8;
+                printf(" : %" PRIu64, *val);
+                break;
+            }
+            case WIST_VM_OP_CLOSURE: {
+                clo_count++;
+                uint16_t *val = (uint16_t *) pc;
+                pc += 2;
+                printf(" : %" PRIu16, *val);
+                break;
+            }
+            case WIST_VM_OP_MKB: {
+                uint16_t *val = (uint16_t *) pc;
+                pc += 2;
+                printf(" : %" PRIu16, *val);
+                break;
+            }
+            case WIST_VM_OP_ACCESS: {
+                uint8_t *val = (uint8_t *) pc;
+                pc += 1;
+                printf(" : %" PRIu8, *val);
+                break;
+            }
+            case WIST_VM_OP_RETURN:
+                if (clo_count == 0){
+                    printf("\n");
+                    return;
+                }
+                clo_count--;
+                break;
+            case WIST_VM_OP_PUSH:
+            case WIST_VM_OP_APPLY:
+                break;
         }
+        printf("\n");
     }
 }
 
-void wist_vm_obj_print_op(uint8_t op) {
-        printf("%s\n", vm_op_to_string[op]);
+struct wist_vm_obj wist_vm_obj_create_gc(enum wist_vm_obj_kind t, 
+        struct wist_vm_gc_hdr *gc) {
+    struct wist_vm_obj obj = {
+        .t = t,
+        .gc = gc,
+    };
+    return obj;
 }

@@ -22,6 +22,7 @@ const char *lir_expr_to_string_map[] = {
     [WIST_LIR_EXPR_APP] = "Application",
     [WIST_LIR_EXPR_VAR] = "Variable",
     [WIST_LIR_EXPR_INT] = "Integer",
+    [WIST_LIR_EXPR_MKB] = "Make Block",
 };
 
 /* === PROTOTYPES === */
@@ -41,6 +42,14 @@ void wist_lir_expr_destroy(struct wist_compiler *comp,
         case WIST_LIR_EXPR_LAM: 
             wist_lir_expr_destroy(comp, expr->lam.body);
             break;
+        case WIST_LIR_EXPR_MKB: {
+            WIST_VECTOR_FOR_EACH(&expr->mkb.fields, struct wist_lir_expr *, 
+                    field) {
+                wist_lir_expr_destroy(comp, *field);
+            }
+            WIST_VECTOR_FINISH(comp->ctx, &expr->mkb.fields);
+            break;
+        }
         case WIST_LIR_EXPR_APP: 
             wist_lir_expr_destroy(comp, expr->app.fun);
             wist_lir_expr_destroy(comp, expr->app.arg);
@@ -58,6 +67,14 @@ struct wist_lir_expr *wist_lir_create_app(struct wist_compiler *comp,
     struct wist_lir_expr *expr = wist_lir_create_expr(comp, WIST_LIR_EXPR_APP);
     expr->app.fun = fun;
     expr->app.arg = arg;
+    return expr;
+}
+
+struct wist_lir_expr *wist_lir_create_mkb(struct wist_compiler *comp,
+        enum wist_lir_block_kind t, struct wist_vector fields) {
+    struct wist_lir_expr *expr = wist_lir_create_expr(comp, WIST_LIR_EXPR_MKB);
+    expr->mkb.t = t;
+    expr->mkb.fields = fields;
     return expr;
 }
 
@@ -134,6 +151,16 @@ static struct wist_lir_expr *gen_expr_rec(struct wist_compiler *comp,
             printf("Impossible case of no binding for lambda in gen_expr_rec\n");
             return NULL;
         }
+        case WIST_AST_EXPR_TUPLE: {
+            struct wist_vector lir_fields;
+            WIST_VECTOR_INIT(comp->ctx, &lir_fields, struct wist_lir_expr *);
+            WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, field) {
+                struct wist_lir_expr *lir_field = gen_expr_rec(comp, *field, map);
+                WIST_VECTOR_PUSH(comp->ctx, &lir_fields, 
+                        struct wist_lir_expr *, &lir_field);
+            }
+            return wist_lir_create_mkb(comp, WIST_LIR_BLOCK_TUPLE, lir_fields);
+        }
         case WIST_AST_EXPR_INT:
             return wist_lir_create_int(comp, expr->i.val);
     }
@@ -161,6 +188,13 @@ static void print_expr_indent(struct wist_lir_expr *expr, int indent) {
             break;
         case WIST_LIR_EXPR_VAR:
             printf(" : %p", expr->var.origin);
+            break;
+        case WIST_LIR_EXPR_MKB:
+            WIST_VECTOR_FOR_EACH(&expr->mkb.fields, struct wist_lir_expr *, 
+                    field) {
+                printf("\n");
+                print_expr_indent(*field, indent + 1);
+            }
             break;
         case WIST_LIR_EXPR_INT:
             printf(" : %" PRId64, expr->i.val);

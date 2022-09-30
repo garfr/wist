@@ -7,7 +7,9 @@
 #ifndef _WIST_VM_OBJ_H
 #define _WIST_VM_OBJ_H
 
-#include <wist/vm_gc.h>
+#include <wist.h>
+
+struct wist_vm_gc_hdr;
 
 enum wist_vm_op {
 #define OPCODE(name, _args) WIST_VM_OP_##name,
@@ -19,6 +21,7 @@ __WIST_VM_OP_COUNT /* The number of opcodes. */
 enum wist_vm_obj_kind {
     WIST_VM_OBJ_CLO = WIST_OBJ_CLOSURE,
     WIST_VM_OBJ_INT = WIST_OBJ_INTEGER,
+    WIST_VM_OBJ_TUPLE = WIST_OBJ_TUPLE,
 
     /* These are internal types the user won't (shouldn't) see. */
     WIST_VM_OBJ_ENV,
@@ -36,25 +39,19 @@ struct wist_vm_obj {
     };
 };
 
-struct wist_vm_env {
-    struct wist_vm_gc_hdr hdr;
-    struct wist_vm_obj val;
-    struct wist_vm_obj next;
-};
-
-struct wist_vm_closure {
-    struct wist_vm_gc_hdr hdr;
-    uint8_t *code;
-    size_t code_len;
-    struct wist_vm_obj env;
-};
+#include <wist/vm_gc.h>
 
 #define WIST_VM_TO_GC_HDR(_ptr) (&(_ptr)->hdr)
 
-#define WIST_VM_GET_CLOSURE(_obj) ((struct wist_vm_closure *) (_obj).gc)
-#define WIST_VM_GET_ENV(_obj) ((struct wist_vm_env *) (_obj).gc)
+struct wist_vm_obj wist_vm_obj_create_gc(enum wist_vm_obj_kind, 
+        struct wist_vm_gc_hdr *gc);
 
-void wist_vm_obj_print_closure(struct wist_vm_closure *clo);
 void wist_vm_obj_print_op(uint8_t op);
+void wist_vm_obj_print_clo(struct wist_vm_obj clo);
+
+#define WIST_VM_OBJ_CLO_PC(_obj) ((uint8_t *) &((_obj).gc->fields[1]))
+#define WIST_VM_OBJ_FIELD1(_obj) ((_obj).gc->fields[0])
+#define WIST_VM_OBJ_FIELD2(_obj) ((_obj).gc->fields[1])
+#define WIST_VM_OBJ_FIELD(_obj, _n) ((_obj).gc->fields[_n])
 
 #endif /* _WIST_VM_OBJ_H */

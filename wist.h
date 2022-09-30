@@ -70,6 +70,7 @@ struct wist_handle;
 enum wist_obj_type {
     WIST_OBJ_CLOSURE,
     WIST_OBJ_INTEGER,
+    WIST_OBJ_TUPLE,
 };
 
 enum wist_obj_type wist_handle_get_type(struct wist_handle *handle);

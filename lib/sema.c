@@ -139,6 +139,17 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             expr->type = ret_type;
             break;
         }
+        case WIST_AST_EXPR_TUPLE: {
+            struct wist_vector types;
+            WIST_VECTOR_INIT(comp->ctx, &types, struct wist_ast_type *);
+            WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, field) {
+                struct wist_ast_type *field_ty = infer_expr_rec(comp, scope, 
+                        *field, non_generics);
+                WIST_VECTOR_PUSH(comp->ctx, &types, struct wist_ast_type *, &field_ty);
+            }
+            expr->type = wist_ast_create_tuple_type(comp, types);
+            break;
+        }
         case WIST_AST_EXPR_INT: {
             expr->type = wist_ast_create_int_type(comp);
             break;
@@ -182,6 +193,27 @@ static bool type_eq(struct wist_ast_type *t1, struct wist_ast_type *t2) {
     switch (t1->t) {
         case WIST_AST_TYPE_VAR:
             return t1->var.id == t2->var.id;
+        case WIST_AST_TYPE_TUPLE: {
+            if (WIST_VECTOR_LEN(&t1->tuple.fields, struct wist_ast_type *)
+             != WIST_VECTOR_LEN(&t2->tuple.fields, struct wist_ast_type *))
+            {
+                return false;
+            }
+            for (size_t i = 0; 
+                 i < WIST_VECTOR_LEN(&t1->tuple.fields, 
+                     struct wist_ast_type *); i++) {
+                struct wist_ast_type *st1 = 
+                    *WIST_VECTOR_INDEX(&t1->tuple.fields, 
+                            struct wist_ast_type *, i);
+                struct wist_ast_type *st2 = 
+                    *WIST_VECTOR_INDEX(&t2->tuple.fields, 
+                            struct wist_ast_type *, i);
+                if (!type_eq(st1, st2)) {
+                    return false;
+                }
+            }
+            return true;
+        }
         case WIST_AST_TYPE_FUN:
             return type_eq(t1->fun.in, t2->fun.in) 
                 && type_eq(t1->fun.out, t2->fun.out);
@@ -241,6 +273,9 @@ static struct wist_ast_type *fresh_type_rec(struct wist_compiler *comp,
                 return type;
             }
         }
+        case WIST_AST_TYPE_TUPLE: {
+            return wist_ast_create_tuple_type(comp, type->tuple.fields);
+        }
         case WIST_AST_TYPE_FUN: {
             return wist_ast_create_fun_type(comp, type->fun.in, type->fun.out);
         }
@@ -298,6 +333,30 @@ static void unify(struct wist_compiler *comp, struct wist_ast_type *_t1,
             unify(comp, t1->fun.out, t2->fun.out);
             break;
         }
+        case WIST_AST_TYPE_TUPLE: {
+            if (WIST_VECTOR_LEN(&t1->tuple.fields, struct wist_ast_type *)
+             != WIST_VECTOR_LEN(&t2->tuple.fields, struct wist_ast_type *))
+            {
+                struct wist_diag *diag = wist_compiler_add_diag(comp, 
+                        WIST_DIAG_TYPE_MISMATCH, WIST_DIAG_ERROR);
+                wist_diag_add_loc(comp, diag, comp->cur_expr->loc);
+                diag->type_mismatch.t1 = t1;
+                diag->type_mismatch.t2 = t2;
+                return;
+            }
+            for (size_t i = 0; 
+                 i < WIST_VECTOR_LEN(&t1->tuple.fields, 
+                     struct wist_ast_type *); i++) {
+                struct wist_ast_type *st1 = 
+                    *WIST_VECTOR_INDEX(&t1->tuple.fields, 
+                            struct wist_ast_type *, i);
+                struct wist_ast_type *st2 = 
+                    *WIST_VECTOR_INDEX(&t2->tuple.fields, 
+                            struct wist_ast_type *, i);
+                unify(comp, st1, st2);
+            }
+            break;
+        }
         case WIST_AST_TYPE_INT:
             break;
         case WIST_AST_TYPE_GEN: 
@@ -315,6 +374,14 @@ static struct wist_ast_type *prune_full_type(struct wist_compiler *comp,
         case WIST_AST_TYPE_FUN: {
             type->fun.in = prune_full_type(comp, type->fun.in, renamer);
             type->fun.out = prune_full_type(comp, type->fun.out, renamer);
+            break;
+        }
+        case WIST_AST_TYPE_TUPLE: {
+            WIST_VECTOR_FOR_EACH(&type->tuple.fields, struct wist_ast_type *, 
+                    t1) {
+                struct wist_ast_type *p1 = prune_full_type(comp, *t1, renamer);
+                *t1 = p1;
+            }
             break;
         }
         case WIST_AST_TYPE_VAR: {
@@ -339,6 +406,12 @@ static void prune_full_expr(struct wist_compiler *comp,
         case WIST_AST_EXPR_APP: 
             prune_full_expr(comp, expr->app.fun, renamer);
             prune_full_expr(comp, expr->app.arg, renamer);
+            break;
+        case WIST_AST_EXPR_TUPLE: 
+            WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, 
+                    field) {
+                prune_full_expr(comp, *field, renamer);
+            }
             break;
         case WIST_AST_EXPR_VAR:
         case WIST_AST_EXPR_INT:

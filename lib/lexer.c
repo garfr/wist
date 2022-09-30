@@ -49,6 +49,7 @@ const char *token_to_string_map[] = {
     [WIST_TOKEN_THIN_ARROW] = "Thin_Arrow",
     [WIST_TOKEN_LPAREN] = "LParen",
     [WIST_TOKEN_RPAREN] = "RParen",
+    [WIST_TOKEN_COMMA] = "Comma",
     [WIST_TOKEN_EOI] = "Eoi"
 };
 
@@ -103,6 +104,7 @@ void wist_token_print(struct wist_compiler *comp, struct wist_token tok) {
         case WIST_TOKEN_THIN_ARROW:
         case WIST_TOKEN_LPAREN:
         case WIST_TOKEN_RPAREN:
+        case WIST_TOKEN_COMMA:
             break;
         default:
             printf("Unimplemented switch case in wist_token_print\n");
@@ -202,6 +204,8 @@ not_integer:
             return make_token(lexer, WIST_TOKEN_LPAREN);
         case ')':
             return make_token(lexer, WIST_TOKEN_RPAREN);
+        case ',':
+            return make_token(lexer, WIST_TOKEN_COMMA);
         case '-': {
             SKIP_C(lexer);
             if ((c = PEEK_C(lexer)) == '>') {
