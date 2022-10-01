@@ -8,6 +8,7 @@
 #define _WIST_VM_OBJ_H
 
 #include <wist.h>
+#include <wist/vector.h>
 
 struct wist_vm_gc_hdr;
 
@@ -37,6 +38,7 @@ struct wist_vm_obj {
     union {
         int64_t i; 
         struct wist_vm_gc_hdr *gc;
+        size_t idx; /* For indexing the code area. */
     };
 };
 
@@ -48,9 +50,8 @@ struct wist_vm_obj wist_vm_obj_create_gc(enum wist_vm_obj_kind,
         struct wist_vm_gc_hdr *gc);
 
 void wist_vm_obj_print_op(uint8_t op);
-void wist_vm_obj_print_clo(struct wist_vm_obj clo);
+void wist_vm_obj_print_clo(struct wist_vm *vm, struct wist_vm_obj clo);
 
-#define WIST_VM_OBJ_CLO_PC(_obj) ((uint8_t *) &((_obj).gc->fields[1]))
 #define WIST_VM_OBJ_FIELD1(_obj) ((_obj).gc->fields[0])
 #define WIST_VM_OBJ_FIELD2(_obj) ((_obj).gc->fields[1])
 #define WIST_VM_OBJ_FIELD(_obj, _n) ((_obj).gc->fields[_n])

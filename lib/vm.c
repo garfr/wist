@@ -30,6 +30,7 @@ struct wist_vm *wist_vm_create(struct wist_ctx *ctx) {
     vm->ctx = ctx;
     wist_vm_gc_init(ctx, &vm->gc);
     WIST_VECTOR_INIT(ctx, &vm->handles, struct wist_handle);
+    WIST_VECTOR_INIT(ctx, &vm->code_area, uint8_t);
     return vm;
 }
 
@@ -57,7 +58,7 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
     struct wist_vm_obj accum, env = WIST_VM_OBJ_FIELD1(clo);
     uint8_t *pc;
 
-    pc = WIST_VM_OBJ_CLO_PC(clo);
+    pc = WIST_VM_OBJ_CLO_PC(vm, clo);
 
     struct wist_vm_obj arg_stack[WIST_VM_ASP_MAX_SIZE];
     struct wist_vm_obj *asp = arg_stack;
@@ -73,12 +74,11 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
             case WIST_VM_OP_CLOSURE: {
                 uint16_t code_len = *((uint16_t *) pc);
                 pc += 2;
-                accum = WIST_VM_GC_ALLOC(&vm->gc, 2 + (code_len / 
-                            sizeof(struct wist_vm_obj)), WIST_VM_OBJ_CLO);
-                memcpy(&WIST_VM_OBJ_FIELD2(accum), pc, code_len);
+                accum = WIST_VM_GC_ALLOC(&vm->gc, 2, WIST_VM_OBJ_CLO);
+                WIST_VM_OBJ_FIELD2(accum).idx = pc - WIST_VECTOR_DATA(&vm->code_area, uint8_t);
                 pc += code_len;
                 size_t env_count = extra_args + WIST_VM_OBJ_FIELD_COUNT(env);
-                struct wist_vm_obj full_env = WIST_VM_GC_ALLOC(&vm->gc, env_count, WIST_VM_OBJ_CLO);
+                struct wist_vm_obj full_env = WIST_VM_GC_ALLOC(&vm->gc, env_count, WIST_VM_OBJ_ENV);
                 for (size_t i = 0; i < extra_args; i++) {
                     WIST_VM_OBJ_FIELD(full_env, i) = (--rsp)->env;
                 }
@@ -99,6 +99,33 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                 asp++;
                 break;
             }
+            case WIST_VM_OP_GRAB: {
+                if ((asp - 1)->t == WIST_VM_OBJ_MARK) {
+                    asp--;
+                    accum = WIST_VM_GC_ALLOC(&vm->gc, 2, WIST_VM_OBJ_CLO);
+                    WIST_VM_OBJ_FIELD2(accum).idx = pc - WIST_VECTOR_DATA(&vm->code_area, uint8_t);
+                    size_t env_count = extra_args + WIST_VM_OBJ_FIELD_COUNT(env);
+                    struct wist_vm_obj full_env = WIST_VM_GC_ALLOC(&vm->gc, env_count, WIST_VM_OBJ_CLO);
+                    for (size_t i = 0; i < extra_args; i++) {
+                        WIST_VM_OBJ_FIELD(full_env, i) = (--rsp)->env;
+                    }
+                    for (size_t i = 0; i < WIST_VM_OBJ_FIELD_COUNT(env); i++) {
+                        WIST_VM_OBJ_FIELD(full_env, i + extra_args) = WIST_VM_OBJ_FIELD(env, i);
+                    }
+                    WIST_VM_OBJ_FIELD1(accum) = full_env;
+
+                    rsp--;
+                    pc = rsp->frame.pc;
+                    env = rsp->frame.env;
+                    extra_args = rsp->frame.extra_args;
+                } else {
+                    asp--;
+                    rsp->env = *asp;
+                    rsp++;
+                    extra_args++;
+                }
+                break;
+            }
             case WIST_VM_OP_APPLY: {
                 struct return_frame *frame = rsp++;
                 frame->frame.pc = pc;
@@ -108,7 +135,15 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                 frame = rsp++;
                 frame->env = *(--asp);
                 env = WIST_VM_OBJ_FIELD1(accum);
-                pc = WIST_VM_OBJ_CLO_PC(accum);
+                pc = WIST_VM_OBJ_CLO_PC(vm, accum);
+                break;
+            }
+            case WIST_VM_OP_APPTERM: {
+                pc = WIST_VM_OBJ_CLO_PC(vm, accum);
+                env = WIST_VM_OBJ_FIELD1(accum);
+                rsp -= extra_args;
+                extra_args = 1;
+                (rsp++)->env = *(--asp);
                 break;
             }
             case WIST_VM_OP_ACCESS: {
@@ -154,7 +189,7 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
                         rsp -= (extra_args);
                         (rsp + 1)->env = *(--asp);
                         env = WIST_VM_OBJ_FIELD1(accum);
-                        pc = WIST_VM_OBJ_CLO_PC(accum);
+                        pc = WIST_VM_OBJ_CLO_PC(vm, accum);
                         extra_args = 1;
                     }
                     break;

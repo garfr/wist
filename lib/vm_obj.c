@@ -5,6 +5,7 @@
 */
 
 #include <wist/vm_obj.h>
+#include <wist/vm.h>
 
 #include <stdio.h>
 #include <stddef.h>
@@ -20,9 +21,9 @@ void wist_vm_obj_print_op(uint8_t op) {
         printf("%s\n", vm_op_to_string[op]);
 }
 
-void wist_vm_obj_print_clo(struct wist_vm_obj clo) {
+void wist_vm_obj_print_clo(struct wist_vm *vm, struct wist_vm_obj clo) {
     int clo_count = 0;
-    uint8_t *pc = WIST_VM_OBJ_CLO_PC(clo);
+    uint8_t *pc = WIST_VM_OBJ_CLO_PC(vm, clo);
     uint8_t op;
 
     while (1) {
@@ -64,6 +65,8 @@ void wist_vm_obj_print_clo(struct wist_vm_obj clo) {
             case WIST_VM_OP_PUSH:
             case WIST_VM_OP_PUSHMARK:
             case WIST_VM_OP_APPLY:
+            case WIST_VM_OP_APPTERM:
+            case WIST_VM_OP_GRAB:
                 break;
         }
         printf("\n");

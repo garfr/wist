@@ -27,9 +27,13 @@ static void wist_vector_init(struct wist_ctx *ctx, struct wist_vector *vec,
 static void *wist_vector_push_uninit(struct wist_ctx *ctx, struct wist_vector *vec,
         size_t item_size) {
     if (vec->data_used + item_size >= vec->data_alloc) {
+        size_t new_alloc = vec->data_alloc;
+        while (new_alloc < vec->data_used + item_size) {
+            new_alloc *= 2;
+        }
         vec->data = WIST_CTX_RESIZE(ctx, vec->data, uint8_t, vec->data_alloc, 
-                vec->data_alloc * 2);
-        vec->data_alloc *= 2;
+                new_alloc);
+        vec->data_alloc = new_alloc;
     }
 
     void *ptr = vec->data + vec->data_used;
@@ -42,6 +46,23 @@ static void wist_vector_push(struct wist_ctx *ctx, struct wist_vector *vec,
     void *ptr = wist_vector_push_uninit(ctx, vec, item_size);
 
     memcpy(ptr, new_item, item_size);
+}
+
+static void wist_vector_push_arr(struct wist_ctx *ctx, struct wist_vector *vec,
+        size_t item_size, void *arr, size_t arr_len) {
+    size_t total_size = item_size * arr_len;
+    if (vec->data_used + total_size >= vec->data_alloc) {
+        size_t new_alloc = vec->data_alloc;
+        while (new_alloc < vec->data_used + total_size) {
+            new_alloc *= 2;
+        }
+        vec->data = WIST_CTX_RESIZE(ctx, vec->data, uint8_t, vec->data_alloc, 
+                new_alloc);
+        vec->data_alloc = new_alloc;
+    }
+
+    memcpy(vec->data + vec->data_used, arr, total_size);
+    vec->data_used += total_size;
 }
 
 static void wist_vector_finish(struct wist_ctx *ctx, struct wist_vector *vec) {
@@ -70,6 +91,7 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
     (void) wist_vector_index;
     (void) wist_vector_finish;
     (void) wist_vector_push;
+    (void) wist_vector_push_arr;
     (void) wist_vector_init;
 }
 
@@ -80,6 +102,8 @@ static void wist_vector_fix_size(struct wist_ctx *ctx, struct wist_vector *vec) 
 
 #define WIST_VECTOR_PUSH(_ctx, _vec, _type, _item)                             \
     wist_vector_push(_ctx, _vec, sizeof(_type), _item)
+#define WIST_VECTOR_PUSH_ARR(_ctx, _vec, _type, _item, _len)                   \
+    wist_vector_push_arr(_ctx, _vec, sizeof(_type), _item, _len)
 #define WIST_VECTOR_PUSH_UNINIT(_ctx, _vec, _type)                             \
     ((_type *) wist_vector_push_uninit(_ctx, _vec, sizeof(_type)))
 #define WIST_VECTOR_INDEX(_vec, _type, _idx)                                   \

@@ -17,7 +17,6 @@
 struct index_map {
     struct index_map *next;
     struct wist_lir_expr *expr;
-    uint64_t index;
 };
 
 struct code_builder {
@@ -56,15 +55,17 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
 
     code_builder_add_8(&builder, WIST_VM_OP_RETURN);
 
-    struct wist_vm_obj clo = WIST_VM_GC_ALLOC(&vm->gc, 2 + 
-            (WIST_VECTOR_LEN(&builder.code, uint8_t) 
-           / sizeof(struct wist_vm_obj)), WIST_VM_OBJ_CLO);
-    memcpy(WIST_VM_OBJ_CLO_PC(clo), WIST_VECTOR_DATA(&builder.code, uint8_t), 
+    struct wist_vm_obj clo = WIST_VM_GC_ALLOC(&vm->gc, 2, WIST_VM_OBJ_CLO);
+    WIST_VM_OBJ_FIELD1(clo) = WIST_VM_GC_ALLOC(&vm->gc, 0, WIST_VM_OBJ_ENV);
+    WIST_VM_OBJ_FIELD2(clo).idx = WIST_VECTOR_LEN(&vm->code_area, uint8_t);
+
+    WIST_VECTOR_PUSH_ARR(vm->ctx, &vm->code_area, uint8_t, 
+            WIST_VECTOR_DATA(&builder.code, uint8_t), 
             WIST_VECTOR_LEN(&builder.code, uint8_t));
 
     wist_lir_expr_destroy(comp, lir_expr);
 
-    wist_vm_obj_print_clo(clo);
+    wist_vm_obj_print_clo(vm, clo);
 
     struct wist_handle *handle = wist_vm_add_handle(vm);
     handle->obj = clo;
@@ -114,6 +115,35 @@ static size_t code_builder_add_16_uninit(struct code_builder *builder) {
     return idx;
 }
 
+static void gen_expr_tco_rec(struct code_builder *builder,
+        struct wist_lir_expr *expr) {
+    switch (expr->t) {
+        case WIST_LIR_EXPR_APP:
+            struct wist_lir_expr *fun = expr;
+            while (fun->t == WIST_LIR_EXPR_APP) {
+                gen_expr_rec(builder, fun->app.arg);
+                code_builder_add_8(builder, WIST_VM_OP_PUSH);
+                fun = fun->app.fun;
+            }
+            gen_expr_rec(builder, fun);
+            code_builder_add_8(builder, WIST_VM_OP_APPTERM);
+            break;
+        case WIST_LIR_EXPR_LAM:
+            struct index_map *new_index = WIST_CTX_NEW(builder->ctx, struct index_map);
+            new_index->expr = expr;
+            new_index->next = builder->indices;
+            builder->indices = new_index;
+            code_builder_add_8(builder, WIST_VM_OP_GRAB);
+            gen_expr_tco_rec(builder, expr->lam.body);
+            new_index = builder->indices;
+            builder->indices = new_index->next;
+            WIST_CTX_FREE(builder->ctx, new_index, struct index_map);
+            break;
+        default:
+            gen_expr_rec(builder, expr);
+    }
+}
+
 static void gen_expr_rec(struct code_builder *builder, 
         struct wist_lir_expr *expr) {
     switch (expr->t) {
@@ -122,13 +152,7 @@ static void gen_expr_rec(struct code_builder *builder,
             code_builder_add_64(builder, expr->i.val); 
             break;
         case WIST_LIR_EXPR_LAM: {
-            struct index_map *map = builder->indices;
-            while (map != NULL) {
-                map->index++;
-                map = map->next;
-            }
             struct index_map *new_index = WIST_CTX_NEW(builder->ctx, struct index_map);
-            new_index->index = 0;
             new_index->expr = expr;
             new_index->next = builder->indices;
             builder->indices = new_index;
@@ -136,7 +160,7 @@ static void gen_expr_rec(struct code_builder *builder,
             size_t closure_size_idx = code_builder_add_16_uninit(builder);
             size_t op_count_before = code_builder_count(builder);
 
-            gen_expr_rec(builder, expr->lam.body);
+            gen_expr_tco_rec(builder, expr->lam.body);
 
             code_builder_add_8(builder, WIST_VM_OP_RETURN);
 
@@ -146,14 +170,9 @@ static void gen_expr_rec(struct code_builder *builder,
             uint16_t closure_sz = (uint16_t) (op_count_after - op_count_before);
             *closure_pos = closure_sz;
 
-            map = builder->indices;
-            builder->indices = map->next;
-            WIST_CTX_FREE(builder->ctx, map, struct index_map);
-            map = builder->indices;
-            while (map != NULL) {
-                map->index--;
-                map = map->next;
-            }
+            new_index = builder->indices;
+            builder->indices = new_index->next;
+            WIST_CTX_FREE(builder->ctx, new_index, struct index_map);
             break;
         }
         case WIST_LIR_EXPR_APP: {
@@ -170,12 +189,14 @@ static void gen_expr_rec(struct code_builder *builder,
         }
         case WIST_LIR_EXPR_VAR: {
             struct index_map *map = builder->indices;
+            int idx = 0;
             while (map != NULL) {
                 if (map->expr == expr->var.origin) {
                     code_builder_add_8(builder, WIST_VM_OP_ACCESS);
-                    code_builder_add_8(builder, map->index);
+                    code_builder_add_8(builder, idx);
                     break;
                 }
+                idx++;
                 map = map->next;
             }
             break;
