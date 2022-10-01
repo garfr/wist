@@ -144,12 +144,12 @@ static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser)
 
     switch (tok.t) {
         case WIST_TOKEN_LPAREN: {
-            struct wist_token start_tok = NEXT_TOK(parser);
+            struct wist_token start_tok = NEXT_TOK(parser), end_tok;
             struct wist_ast_expr *expr = parse_expr(parser);
             if (PEEK_TOK(parser).t == WIST_TOKEN_COMMA) {
                 return parse_tuple(parser, start_tok, expr);
             }
-            struct wist_token end_tok = NEXT_TOK(parser); 
+            expect(parser, &end_tok, WIST_TOKEN_RPAREN); 
             if (expr != NULL) {
                 expr->loc = wist_srcloc_index_combine(parser->comp->ctx, 
                         &parser->comp->srclocs, start_tok.loc, end_tok.loc);
@@ -159,12 +159,28 @@ static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser)
         case WIST_TOKEN_SYM:
             SKIP_TOK(parser);
             return wist_ast_create_var(parser->comp, tok.loc, tok.sym);
+        case WIST_TOKEN_LET: {
+            struct wist_token start_tok = NEXT_TOK(parser), end_tok; 
+            struct wist_token sym_tok;
+            expect(parser, &sym_tok, WIST_TOKEN_SYM);
+            expect(parser, NULL, WIST_TOKEN_EQ);
+            struct wist_ast_expr *val = parse_expr(parser);
+            expect(parser, NULL, WIST_TOKEN_IN);
+            struct wist_ast_expr *body = parse_expr(parser);
+            expect(parser, &end_tok, WIST_TOKEN_END);
+            struct wist_srcloc full_loc = 
+                wist_srcloc_index_combine(parser->comp->ctx, 
+                    &parser->comp->srclocs, start_tok.loc, end_tok.loc);
+            return wist_ast_create_let(parser->comp, full_loc, sym_tok.sym, val, body);
+        }
         case WIST_TOKEN_INT:
             SKIP_TOK(parser);
             return wist_ast_create_int(parser->comp, tok.loc, tok.i);
         case WIST_TOKEN_EOI:
         case WIST_TOKEN_RPAREN:
         case WIST_TOKEN_COMMA:
+        case WIST_TOKEN_IN:
+        case WIST_TOKEN_END:
             return NULL;
         default: {
             struct wist_diag *diag = wist_compiler_add_diag(parser->comp, 

@@ -67,7 +67,7 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
     uint32_t extra_args = 0;
 
     accum.t = WIST_VM_OBJ_UNDEFINED;
-    env = WIST_VM_GC_ALLOC(&vm->gc, 0, WIST_VM_OBJ_ENV);
+    struct wist_vm_obj empty_env = WIST_VM_GC_ALLOC(&vm->gc, 0, WIST_VM_OBJ_ENV);
 
     while (1) {
         switch (*pc++){
@@ -92,6 +92,24 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
             }
             case WIST_VM_OP_PUSH: {
                 *asp++ = accum;
+                break;
+            }
+            case WIST_VM_OP_LET: {
+                (rsp++)->env = accum;
+                extra_args++;
+                break;
+            }
+            case WIST_VM_OP_ENDLET: {
+                if (extra_args > 0) {
+                    rsp--;
+                    extra_args--;
+                } else {
+                    extra_args = WIST_VM_OBJ_FIELD_COUNT(env) - 1;
+                    for (size_t i = 0; i < extra_args; i++) {
+                        (rsp++)->env = WIST_VM_OBJ_FIELD(env, i + 1);
+                    }
+                    env = empty_env;
+                }
                 break;
             }
             case WIST_VM_OP_PUSHMARK: {

@@ -25,10 +25,11 @@ struct wist_sym {
 /* Manages all existing symbols. */
 struct wist_sym_index {
     struct wist_sym *syms;
+    struct wist_sym *let_sym, *in_sym, *end_sym;
 };
 
 /* Initializes a new (empty) symbol index. */
-void wist_sym_index_init(struct wist_sym_index *index);
+void wist_sym_index_init(struct wist_ctx *ctx, struct wist_sym_index *index);
 
 /* Releases the symbol index. */
 void wist_sym_index_finish(struct wist_ctx *ctx, struct wist_sym_index *index);

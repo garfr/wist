@@ -105,8 +105,25 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
     switch (expr->t) {
         case WIST_AST_EXPR_VAR: {
             struct wist_ast_var_entry *entry = wist_ast_scope_find(scope, expr->var.sym);
+            if (entry == NULL) {
+                struct wist_diag *diag = wist_compiler_add_diag(comp, 
+                        WIST_DIAG_UNKNOWN_VAR, WIST_DIAG_ERROR);
+                wist_diag_add_loc(comp, diag, expr->loc);
+                diag->unknown_var = expr->var.sym;
+            }
             expr->var.var = entry;
             expr->type = fresh_type(comp, entry->type, non_generics);
+            break;
+        }
+        case WIST_AST_EXPR_LET: {
+            struct wist_ast_type *val_ty = infer_expr_rec(comp, scope, 
+                    expr->let.val, non_generics);
+            struct wist_ast_scope *new_scope = wist_ast_scope_push(comp, scope);
+            struct wist_ast_var_entry *entry = wist_ast_scope_insert(comp, 
+                    new_scope, expr->let.sym, val_ty);
+            expr->type = infer_expr_rec(comp, new_scope, expr->let.body, non_generics);
+            expr->let.scope = new_scope;
+            expr->let.var = entry;
             break;
         }
         case WIST_AST_EXPR_LAM: {
@@ -406,6 +423,10 @@ static void prune_full_expr(struct wist_compiler *comp,
         case WIST_AST_EXPR_APP: 
             prune_full_expr(comp, expr->app.fun, renamer);
             prune_full_expr(comp, expr->app.arg, renamer);
+            break;
+        case WIST_AST_EXPR_LET:
+            prune_full_expr(comp, expr->let.val, renamer);
+            prune_full_expr(comp, expr->let.body, renamer);
             break;
         case WIST_AST_EXPR_TUPLE: 
             WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, 

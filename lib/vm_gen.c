@@ -14,15 +14,9 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-struct index_map {
-    struct index_map *next;
-    struct wist_lir_expr *expr;
-};
-
 struct code_builder {
     struct wist_ctx *ctx;
     struct wist_vector code;
-    struct index_map *indices;
 };
 
 /* === PROTOTYPES === */
@@ -48,6 +42,9 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
     IGNORE(vm);
 
     struct wist_lir_expr *lir_expr = wist_compiler_lir_gen_expr(comp, expr);
+
+
+    wist_lir_print_expr(lir_expr);
 
     code_builder_init(comp->ctx, &builder);
 
@@ -78,7 +75,6 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
 static void code_builder_init(struct wist_ctx *ctx, 
         struct code_builder *builder) {
     builder->ctx = ctx;
-    builder->indices = NULL;
     WIST_VECTOR_INIT(ctx, &builder->code, uint8_t);
 }
 
@@ -129,15 +125,13 @@ static void gen_expr_tco_rec(struct code_builder *builder,
             code_builder_add_8(builder, WIST_VM_OP_APPTERM);
             break;
         case WIST_LIR_EXPR_LAM:
-            struct index_map *new_index = WIST_CTX_NEW(builder->ctx, struct index_map);
-            new_index->expr = expr;
-            new_index->next = builder->indices;
-            builder->indices = new_index;
             code_builder_add_8(builder, WIST_VM_OP_GRAB);
             gen_expr_tco_rec(builder, expr->lam.body);
-            new_index = builder->indices;
-            builder->indices = new_index->next;
-            WIST_CTX_FREE(builder->ctx, new_index, struct index_map);
+            break;
+        case WIST_LIR_EXPR_LET: 
+            gen_expr_rec(builder, expr->let.val);
+            code_builder_add_8(builder, WIST_VM_OP_LET); 
+            gen_expr_tco_rec(builder, expr->let.body);
             break;
         default:
             gen_expr_rec(builder, expr);
@@ -152,10 +146,6 @@ static void gen_expr_rec(struct code_builder *builder,
             code_builder_add_64(builder, expr->i.val); 
             break;
         case WIST_LIR_EXPR_LAM: {
-            struct index_map *new_index = WIST_CTX_NEW(builder->ctx, struct index_map);
-            new_index->expr = expr;
-            new_index->next = builder->indices;
-            builder->indices = new_index;
             code_builder_add_8(builder, WIST_VM_OP_CLOSURE);
             size_t closure_size_idx = code_builder_add_16_uninit(builder);
             size_t op_count_before = code_builder_count(builder);
@@ -169,10 +159,6 @@ static void gen_expr_rec(struct code_builder *builder,
                 WIST_VECTOR_INDEX(&builder->code, uint8_t, closure_size_idx);
             uint16_t closure_sz = (uint16_t) (op_count_after - op_count_before);
             *closure_pos = closure_sz;
-
-            new_index = builder->indices;
-            builder->indices = new_index->next;
-            WIST_CTX_FREE(builder->ctx, new_index, struct index_map);
             break;
         }
         case WIST_LIR_EXPR_APP: {
@@ -188,17 +174,8 @@ static void gen_expr_rec(struct code_builder *builder,
             break;
         }
         case WIST_LIR_EXPR_VAR: {
-            struct index_map *map = builder->indices;
-            int idx = 0;
-            while (map != NULL) {
-                if (map->expr == expr->var.origin) {
-                    code_builder_add_8(builder, WIST_VM_OP_ACCESS);
-                    code_builder_add_8(builder, idx);
-                    break;
-                }
-                idx++;
-                map = map->next;
-            }
+            code_builder_add_8(builder, WIST_VM_OP_ACCESS);
+            code_builder_add_8(builder, expr->var.index);
             break;
         }
         case WIST_LIR_EXPR_MKB: {
@@ -211,6 +188,14 @@ static void gen_expr_rec(struct code_builder *builder,
                     WIST_VECTOR_LEN(&expr->mkb.fields, struct wist_lir_expr *));
             break;
         }
+        case WIST_LIR_EXPR_LET: 
+            gen_expr_rec(builder, expr->let.val);
+            code_builder_add_8(builder, WIST_VM_OP_LET); 
+            
+            gen_expr_rec(builder, expr->let.body);
+            code_builder_add_8(builder, WIST_VM_OP_ENDLET); 
+
+            break;
         default: 
             printf("Cannot generate vm code for expression %d\n", expr->t);
             return;

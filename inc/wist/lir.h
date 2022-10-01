@@ -15,6 +15,7 @@ enum wist_lir_expr_kind {
     WIST_LIR_EXPR_LAM,
     WIST_LIR_EXPR_APP,
     WIST_LIR_EXPR_VAR,
+    WIST_LIR_EXPR_LET,
     WIST_LIR_EXPR_INT,
     WIST_LIR_EXPR_MKB,
 };
@@ -36,7 +37,13 @@ struct wist_lir_expr {
         } lam;
 
         struct {
+            struct wist_lir_expr *body;
+            struct wist_lir_expr *val;
+        } let;
+
+        struct {
             struct wist_lir_expr *origin;
+            int index;
         } var;
 
         struct {
@@ -59,8 +66,10 @@ struct wist_lir_expr *wist_lir_create_app(struct wist_compiler *comp,
         struct wist_lir_expr *fun, struct wist_lir_expr *arg);
 struct wist_lir_expr *wist_lir_create_lam(struct wist_compiler *comp,
         struct wist_lir_expr *body);
+struct wist_lir_expr *wist_lir_create_let(struct wist_compiler *comp,
+        struct wist_lir_expr *val, struct wist_lir_expr *body);
 struct wist_lir_expr *wist_lir_create_var(struct wist_compiler *comp,
-        struct wist_lir_expr *origin);
+        int index, struct wist_lir_expr *origin);
 struct wist_lir_expr *wist_lir_create_mkb(struct wist_compiler *comp,
         enum wist_lir_block_kind t, struct wist_vector mkb);
 struct wist_lir_expr *wist_lir_create_int(struct wist_compiler *comp, 

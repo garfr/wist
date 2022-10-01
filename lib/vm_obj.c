@@ -67,6 +67,8 @@ void wist_vm_obj_print_clo(struct wist_vm *vm, struct wist_vm_obj clo) {
             case WIST_VM_OP_APPLY:
             case WIST_VM_OP_APPTERM:
             case WIST_VM_OP_GRAB:
+            case WIST_VM_OP_LET:
+            case WIST_VM_OP_ENDLET:
                 break;
         }
         printf("\n");

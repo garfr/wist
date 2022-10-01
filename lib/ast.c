@@ -11,19 +11,20 @@
 #include <inttypes.h>
 
 const char *ast_expr_to_string_map[] = {
-    [WIST_AST_EXPR_LAM] = "Lambda",
-    [WIST_AST_EXPR_APP] = "Application",
-    [WIST_AST_EXPR_VAR] = "Variable",
-    [WIST_AST_EXPR_INT] = "Integer",
+    [WIST_AST_EXPR_LAM]   = "Lambda",
+    [WIST_AST_EXPR_APP]   = "Application",
+    [WIST_AST_EXPR_VAR]   = "Variable",
+    [WIST_AST_EXPR_INT]   = "Integer",
+    [WIST_AST_EXPR_LET]   = "Let",
     [WIST_AST_EXPR_TUPLE] = "Tuple",
 };
 
 const char *ast_type_to_string_map[] = {
-    [WIST_AST_TYPE_FUN] = "Function",
-    [WIST_AST_TYPE_VAR] = "Variable",
-    [WIST_AST_TYPE_GEN] = "Generic",
+    [WIST_AST_TYPE_FUN]   = "Function",
+    [WIST_AST_TYPE_VAR]   = "Variable",
+    [WIST_AST_TYPE_GEN]   = "Generic",
     [WIST_AST_TYPE_TUPLE] = "Tuple",
-    [WIST_AST_TYPE_INT] = "Integer",
+    [WIST_AST_TYPE_INT]   = "Integer",
 };
 
 /* === PROTOTYPES === */
@@ -82,6 +83,16 @@ struct wist_ast_expr *wist_ast_create_tuple(struct wist_compiler *comp,
         struct wist_srcloc loc, struct wist_vector fields) {
     struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_TUPLE, loc);
     expr->tuple.fields = fields;
+    return expr;
+}
+
+struct wist_ast_expr *wist_ast_create_let(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_sym *sym, struct wist_ast_expr *val,
+        struct wist_ast_expr *body) {
+    struct wist_ast_expr *expr = wist_ast_create_expr(comp, WIST_AST_EXPR_LET, loc);
+    expr->let.sym = sym;
+    expr->let.val = val;
+    expr->let.body = body;
     return expr;
 }
 
@@ -175,6 +186,10 @@ void wist_ast_expr_destroy(struct wist_compiler *comp,
             wist_ast_expr_destroy(comp, expr->app.fun);
             wist_ast_expr_destroy(comp, expr->app.arg);
             break;
+        case WIST_AST_EXPR_LET:
+            wist_ast_expr_destroy(comp, expr->let.val);
+            wist_ast_expr_destroy(comp, expr->let.body);
+            break;
         case WIST_AST_EXPR_TUPLE: {
             WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, 
                     field) {
@@ -260,8 +275,8 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
             (const char *) str);
     switch (expr->t) {
         case WIST_AST_EXPR_LAM:
-            printf(" : '%.*s'\n", (int) expr->lam.sym->str_len, (const char *) 
-                    expr->lam.sym->str);
+            printf(" : '%.*s'\n", (int) expr->lam.sym->str_len, 
+                    (const char *) expr->lam.sym->str);
             wist_ast_print_expr_indent(comp, expr->lam.body, indent + 1);
             break;
         case WIST_AST_EXPR_APP:
@@ -269,6 +284,13 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
             wist_ast_print_expr_indent(comp, expr->app.fun, indent + 1);
             printf("\n");
             wist_ast_print_expr_indent(comp, expr->app.arg, indent + 1);
+            break;
+        case WIST_AST_EXPR_LET:
+            printf(" : '%.*s'\n", (int) expr->let.sym->str_len,
+                    (const char *) expr->let.sym->str);
+            wist_ast_print_expr_indent(comp, expr->let.val, indent + 1);
+            printf("\n");
+            wist_ast_print_expr_indent(comp, expr->let.body, indent + 1);
             break;
         case WIST_AST_EXPR_VAR:
             printf(" : '%.*s'", (int) expr->var.sym->str_len, (const char *) 

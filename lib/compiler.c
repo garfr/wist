@@ -43,7 +43,7 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
         const uint8_t *src, size_t src_len, struct wist_ast_expr **expr_out) {
     IGNORE(expr_out);
 
-    wist_sym_index_init(&comp->syms);
+    wist_sym_index_init(comp->ctx, &comp->syms);
     wist_srcloc_index_init(comp->ctx, &comp->srclocs, src, src_len);
 
     struct wist_parse_result *result = WIST_CTX_NEW(comp->ctx, struct wist_parse_result);
@@ -59,10 +59,20 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
         return result;
     }
 
+    for (size_t i = 0; i < tokens_len; i++) {
+        wist_token_print(comp, tokens[i]);
+    }
+
     struct wist_ast_expr *expr = wist_parse_expr(comp, tokens, tokens_len);
     if (expr == NULL)
     {
         goto cleanup;
+    }
+
+    wist_ast_print_expr(comp, expr);
+
+    if (wist_parse_result_has_errors(result)) {
+        return result;
     }
 
     wist_sema_infer_expr(comp, comp->globals, expr);
@@ -70,10 +80,6 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
     wist_ast_print_expr(comp, expr);
 
     if (wist_parse_result_has_errors(result)) {
-        WIST_VECTOR_FOR_EACH(&result->diags, struct wist_diag, diag) {
-            wist_token_print(comp, diag->expected_expr);
-            printf("%d\n", diag->t);
-        }
     }
 
     *expr_out = expr;

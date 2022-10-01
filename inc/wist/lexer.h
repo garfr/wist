@@ -12,6 +12,7 @@
 #include <wist/sym.h>
 
 enum wist_token_kind {
+    /* Punc. */
     WIST_TOKEN_BACKSLASH,  /* \\ */
     WIST_TOKEN_SYM,        /* [a-zA-Z][a-zA-Z0-9_]* */
     WIST_TOKEN_INT,        /* -?[0-9] */
@@ -19,7 +20,14 @@ enum wist_token_kind {
     WIST_TOKEN_LPAREN,     /* ( */
     WIST_TOKEN_RPAREN,     /* ) */
     WIST_TOKEN_COMMA,      /* , */
+    WIST_TOKEN_EQ,         /* = */
 
+    /* Keywords. */
+    WIST_TOKEN_LET,        /* let */
+    WIST_TOKEN_IN,         /* in */
+    WIST_TOKEN_END,        /*  end */
+
+    /* Misc. */
     WIST_TOKEN_EOI,
 };
 

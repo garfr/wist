@@ -64,6 +64,7 @@ enum wist_ast_expr_kind {
     WIST_AST_EXPR_LAM,
     WIST_AST_EXPR_VAR,
     WIST_AST_EXPR_APP,
+    WIST_AST_EXPR_LET,
     WIST_AST_EXPR_INT,
     WIST_AST_EXPR_TUPLE,
 };
@@ -83,23 +84,32 @@ struct wist_ast_expr {
 
         struct {
             struct wist_ast_expr *body;
-            struct wist_ast_scope *scope;
+            struct wist_sym *sym;
             /* [var] and [scope] are NULL until semantic analysis is over. */
             struct wist_ast_var_entry *var;
-            struct wist_sym *sym;
+            struct wist_ast_scope *scope;
         } lam;
 
-         struct {
-             struct wist_ast_expr *fun, *arg;
-         } app;
+        struct {
+            struct wist_ast_expr *fun, *arg;
+        } app;
 
-         struct {
-             int64_t val; /* TODO: Use a bigint to store data larger than integers can. */
-         } i;
+        struct {
+            struct wist_sym *sym;
+            struct wist_ast_expr *val, *body;
 
-         struct {
-             struct wist_vector fields; /* struct wist_ast_expr * */
-         } tuple;
+            /* [var] and [scope] are NULL until semantic analysis is over. */
+            struct wist_ast_var_entry *var;
+            struct wist_ast_scope *scope;
+        } let;
+
+        struct {
+            int64_t val; /* TODO: Use a bigint to store data larger than integers can. */
+        } i;
+
+        struct {
+            struct wist_vector fields; /* struct wist_ast_expr * */
+        } tuple;
     };
 };
 
@@ -121,6 +131,10 @@ struct wist_ast_expr *wist_ast_create_int(struct wist_compiler *comp,
 
 struct wist_ast_expr *wist_ast_create_tuple(struct wist_compiler *comp, 
         struct wist_srcloc loc, struct wist_vector fields);
+
+struct wist_ast_expr *wist_ast_create_let(struct wist_compiler *comp, 
+        struct wist_srcloc loc, struct wist_sym *sym, struct wist_ast_expr *val,
+        struct wist_ast_expr *body);
 
 struct wist_ast_type *wist_ast_create_fun_type(struct wist_compiler *comp,
         struct wist_ast_type *in, struct wist_ast_type *out);

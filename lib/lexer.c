@@ -50,6 +50,12 @@ const char *token_to_string_map[] = {
     [WIST_TOKEN_LPAREN] = "LParen",
     [WIST_TOKEN_RPAREN] = "RParen",
     [WIST_TOKEN_COMMA] = "Comma",
+    [WIST_TOKEN_EQ] = "Eq",         
+
+    [WIST_TOKEN_LET] = "Let",
+    [WIST_TOKEN_IN] = "In", 
+    [WIST_TOKEN_END] = "End",
+
     [WIST_TOKEN_EOI] = "Eoi"
 };
 
@@ -105,6 +111,11 @@ void wist_token_print(struct wist_compiler *comp, struct wist_token tok) {
         case WIST_TOKEN_LPAREN:
         case WIST_TOKEN_RPAREN:
         case WIST_TOKEN_COMMA:
+        case WIST_TOKEN_EQ:
+
+        case WIST_TOKEN_LET:
+        case WIST_TOKEN_IN:
+        case WIST_TOKEN_END:
             break;
         default:
             printf("Unimplemented switch case in wist_token_print\n");
@@ -161,6 +172,14 @@ start:
         struct wist_token tok = make_token(lexer, WIST_TOKEN_SYM);
         tok.sym = wist_sym_index_search(lexer->comp->ctx, &lexer->comp->syms, 
                 str, len);
+        if (tok.sym == lexer->comp->syms.let_sym) {
+            tok.t = WIST_TOKEN_LET;
+        } else if (tok.sym == lexer->comp->syms.in_sym) {
+            tok.t = WIST_TOKEN_IN;
+        } else if (tok.sym == lexer->comp->syms.end_sym) {
+            tok.t = WIST_TOKEN_END;
+        }
+
         return tok;
     }
 
@@ -206,13 +225,14 @@ not_integer:
             return make_token(lexer, WIST_TOKEN_RPAREN);
         case ',':
             return make_token(lexer, WIST_TOKEN_COMMA);
+        case '=':
+            return make_token(lexer, WIST_TOKEN_EQ);
         case '-': {
             SKIP_C(lexer);
             if ((c = PEEK_C(lexer)) == '>') {
                 return make_token(lexer, WIST_TOKEN_THIN_ARROW);
             }
             break;
-
         }
     }
 

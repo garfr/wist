@@ -10,8 +10,14 @@
 
 #include <stdio.h>
 
-void wist_sym_index_init(struct wist_sym_index *index) {
+void wist_sym_index_init(struct wist_ctx *ctx, struct wist_sym_index *index) {
     index->syms = NULL;
+    index->let_sym = wist_sym_index_search(ctx, index, 
+            (const uint8_t *) "let", 3);
+    index->in_sym = wist_sym_index_search(ctx, index, 
+            (const uint8_t *) "in", 2);
+    index->end_sym = wist_sym_index_search(ctx, index, 
+            (const uint8_t *) "end", 3);
 }
 
 void wist_sym_index_finish(struct wist_ctx *ctx, struct wist_sym_index *index) {

@@ -18,6 +18,7 @@ enum wist_diag_kind {
     WIST_DIAG_UNEXPECTED_CHAR,
     WIST_DIAG_EXPECTED_EXPR,
     WIST_DIAG_EXPECTED_TOKEN,
+    WIST_DIAG_UNKNOWN_VAR,
     WIST_DIAG_TYPE_MISMATCH,
     WIST_DIAG_RECURSIVE_TYPE,
 };
@@ -40,6 +41,7 @@ struct wist_diag {
         struct {
             struct wist_ast_type *t1, *t2;
         } type_mismatch;
+        struct wist_sym *unknown_var;
         struct {
             struct wist_ast_type *main, *recursive;
         } recursive_type;
