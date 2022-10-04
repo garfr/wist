@@ -13,6 +13,7 @@
 #include <wist/diag.h>
 #include <wist/lir.h>
 #include <wist/objpool.h>
+#include <wist/toplevel.h>
 
 /* 
  * All the needed state to compile one compilation unit of Wist, both in one 
@@ -30,6 +31,7 @@ struct wist_compiler {
     /* All other types. */
     struct wist_objpool type_pool;
     struct wist_ast_expr *cur_expr; /* Maintained during sema. */
+    struct wist_toplvl toplvl;
 };
 
 struct wist_parse_result {
@@ -50,4 +52,3 @@ void wist_diag_add_loc(struct wist_compiler *comp, struct wist_diag *diag,
 
 
 #endif /* _WIST_COMPILER_H */
-

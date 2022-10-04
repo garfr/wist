@@ -14,9 +14,14 @@ const char *ast_expr_to_string_map[] = {
     [WIST_AST_EXPR_LAM]   = "Lambda",
     [WIST_AST_EXPR_APP]   = "Application",
     [WIST_AST_EXPR_VAR]   = "Variable",
+    [WIST_AST_EXPR_GVAR]   = "Global Variable",
     [WIST_AST_EXPR_INT]   = "Integer",
     [WIST_AST_EXPR_LET]   = "Let",
     [WIST_AST_EXPR_TUPLE] = "Tuple",
+};
+
+const char *ast_decl_to_string_map[] = {
+    [WIST_AST_DECL_BIND] = "Bind",
 };
 
 const char *ast_type_to_string_map[] = {
@@ -31,6 +36,8 @@ const char *ast_type_to_string_map[] = {
 
 static struct wist_ast_expr *wist_ast_create_expr(struct wist_compiler *comp, 
         enum wist_ast_expr_kind t, struct wist_srcloc loc);
+static struct wist_ast_decl *wist_ast_create_decl(struct wist_compiler *comp, 
+        enum wist_ast_decl_kind t, struct wist_srcloc loc);
 static struct wist_ast_type *wist_ast_create_type(struct wist_compiler *comp, 
         enum wist_ast_type_kind t);
 
@@ -130,8 +137,35 @@ struct wist_ast_type *wist_ast_create_int_type(struct wist_compiler *comp) {
     return wist_ast_create_type(comp, WIST_AST_TYPE_INT);
 }
 
+struct wist_ast_decl *wist_ast_create_bind(struct wist_compiler *comp,
+        struct wist_srcloc loc, struct wist_sym *sym, 
+        struct wist_ast_expr *body) {
+    struct wist_ast_decl *decl = wist_ast_create_decl(comp, 
+            WIST_AST_DECL_BIND, loc);
+    decl->bind.sym = sym;
+    decl->bind.body = body;
+    return decl;
+}
+
 void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr) {
     wist_ast_print_expr_indent(comp, expr, 0);
+    printf("\n");
+}
+
+void wist_ast_print_decl(struct wist_compiler *comp, struct wist_ast_decl *decl) {
+    printf("%s", ast_decl_to_string_map[decl->t]);
+
+    switch (decl->t) {
+        case WIST_AST_DECL_BIND: {
+            printf(" : '%.*s'\n", (int) decl->bind.sym->str_len, 
+                    (const uint8_t *) decl->bind.sym->str);
+            wist_ast_print_expr_indent(comp, decl->bind.body, 1);
+            printf("\n");
+            wist_ast_print_type_indent(comp, decl->bind.type, 1);
+            break;
+
+        }
+    }
     printf("\n");
 }
 
@@ -199,12 +233,19 @@ void wist_ast_expr_destroy(struct wist_compiler *comp,
             break;
         }
         case WIST_AST_EXPR_VAR:
+        case WIST_AST_EXPR_GVAR:
         case WIST_AST_EXPR_INT:
             break;
     }
 
     wist_ast_type_destroy(comp, expr->type);
     WIST_CTX_FREE(comp->ctx, expr, struct wist_ast_expr);
+}
+
+void wist_ast_decl_destroy(struct wist_compiler *comp, 
+        struct wist_ast_decl *decl) {
+    (void) comp;
+    (void) decl;
 }
 
 /* === PRIVATES === */
@@ -254,6 +295,14 @@ static struct wist_ast_expr *wist_ast_create_expr(struct wist_compiler *comp,
     return expr;
 }
 
+static struct wist_ast_decl *wist_ast_create_decl(struct wist_compiler *comp, 
+        enum wist_ast_decl_kind t, struct wist_srcloc loc) {
+    struct wist_ast_decl *decl = WIST_CTX_NEW(comp->ctx, struct wist_ast_decl);
+    decl->t = t;
+    decl->loc = loc;
+    return decl;
+}
+
 static struct wist_ast_type *wist_ast_create_type(struct wist_compiler *comp, 
         enum wist_ast_type_kind t) {
     struct wist_ast_type *type = WIST_OBJPOOL_ALLOC(&comp->type_pool, struct wist_ast_type);
@@ -295,6 +344,10 @@ static void wist_ast_print_expr_indent(struct wist_compiler *comp,
         case WIST_AST_EXPR_VAR:
             printf(" : '%.*s'", (int) expr->var.sym->str_len, (const char *) 
                     expr->var.sym->str);
+            break;
+        case WIST_AST_EXPR_GVAR:
+            printf(" : '%.*s'", (int) expr->gvar.sym->str_len, (const char *) 
+                    expr->gvar.sym->str);
             break;
         case WIST_AST_EXPR_INT:
             printf(" : %" PRId64, expr->i.val);

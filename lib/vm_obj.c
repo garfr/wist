@@ -62,6 +62,20 @@ void wist_vm_obj_print_clo(struct wist_vm *vm, struct wist_vm_obj clo) {
                 }
                 clo_count--;
                 break;
+            case WIST_VM_OP_SETGLOBAL: {
+                struct wist_sym *sym = *((struct wist_sym **) pc);
+                pc += sizeof(struct wist_sym **);
+                printf(" : '%.*s'", (int) sym->str_len, 
+                        (const uint8_t *) sym->str);
+                break;
+            }
+            case WIST_VM_OP_GETGLOBAL: {
+                struct wist_sym *sym = *((struct wist_sym **) pc);
+                pc += sizeof(struct wist_sym **);
+                printf(" : '%.*s'", (int) sym->str_len, 
+                        (const uint8_t *) sym->str);
+                break;
+            }
             case WIST_VM_OP_PUSH:
             case WIST_VM_OP_PUSHMARK:
             case WIST_VM_OP_APPLY:

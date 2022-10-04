@@ -24,27 +24,41 @@ int main()
 
     struct wist_vm *vm = wist_vm_create(ctx);
 
-//    const char src[] = "(\\x -> x) 3";
-    const char src[] = "(\\f -> (let f2 = (\\x -> f x) in (\\x -> f2 x) end)) (\\x -> x) 3";
+    const char toplvl_src[] = "x = 3";
+    const char expr_src[] = "x";
 
+    struct wist_ast_decl *decl;
     struct wist_ast_expr *expr;
 
-    struct wist_parse_result *result = wist_compiler_parse_expr(comp, 
-            (const uint8_t *) src, strlen(src), &expr);
+    struct wist_parse_result *result = wist_compiler_parse_decl(comp, 
+            (const uint8_t *) toplvl_src, strlen(toplvl_src), &decl);
+    if (wist_parse_result_has_errors(result))
+    {
+        printf("errors found in toplvl\n");
+        return EXIT_FAILURE;
+    }
+
+    wist_compiler_vm_connect(comp, vm);
+
+    struct wist_handle *handle = wist_compiler_vm_gen_decl(comp, vm, decl);
+
+    wist_vm_eval(vm, handle);
+
+    result = wist_compiler_parse_expr(comp, (const uint8_t *) expr_src, 
+            strlen(expr_src), &expr);
     if (wist_parse_result_has_errors(result))
     {
         printf("errors found in expression\n");
         return EXIT_FAILURE;
     }
 
-    struct wist_handle *val = wist_compiler_vm_gen_expr(comp, vm, expr);
+    handle = wist_compiler_vm_gen_expr(comp, vm, expr);
+    handle = wist_vm_eval(vm, handle);
 
-    struct wist_handle *computed = wist_vm_eval(vm, val);
-
-    printf("%d %" PRId64 "\n", wist_handle_get_type(computed), wist_handle_get_int(computed));
+    printf("%d %" PRId64 "\n", wist_handle_get_type(handle), wist_handle_get_int(handle));
 
     wist_parse_result_destroy(comp, result);
-    wist_ast_expr_destroy(comp, expr);
+    wist_ast_decl_destroy(comp, decl);
 
     wist_vm_destroy(vm);
     wist_compiler_destroy(comp);

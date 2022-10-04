@@ -40,6 +40,8 @@ static struct wist_ast_expr *parse_tuple(struct wist_parser *parser,
  */
 static struct wist_ast_expr *parse_atomic_expr_maybe(struct wist_parser *parser);
 
+static struct wist_ast_decl *parse_decl(struct wist_parser *parser);
+
 /* === PUBLICS === */
 
 struct wist_ast_expr *wist_parse_expr(struct wist_compiler *comp, 
@@ -51,6 +53,17 @@ struct wist_ast_expr *wist_parse_expr(struct wist_compiler *comp,
     };
 
     return parse_expr(&parser);
+}
+
+struct wist_ast_decl *wist_parse_decl(struct wist_compiler *comp, 
+        struct wist_token *tokens, size_t tokens_len) {
+    struct wist_parser parser = {
+        .comp = comp,
+        .tokens = tokens,
+        .tokens_len = tokens_len,
+    };
+
+    return parse_decl(&parser);
 }
 
 /* === PRIVATES === */
@@ -204,3 +217,19 @@ static struct wist_ast_expr *parse_atomic_expr(struct wist_parser *parser) {
 
     return expr;
 }
+
+static struct wist_ast_decl *parse_decl(struct wist_parser *parser) {
+    struct wist_token sym_tok;
+
+    expect(parser, &sym_tok, WIST_TOKEN_SYM);
+
+    expect(parser, NULL, WIST_TOKEN_EQ);
+
+    struct wist_ast_expr *expr = parse_expr(parser);
+
+    struct wist_srcloc full_loc = wist_srcloc_index_combine(parser->comp->ctx, 
+            &parser->comp->srclocs, sym_tok.loc, expr->loc);
+
+    return wist_ast_create_bind(parser->comp, full_loc, sym_tok.sym, expr);
+}
+

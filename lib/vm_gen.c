@@ -39,10 +39,8 @@ static void gen_expr_rec(struct code_builder *builder,
 struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
         struct wist_vm *vm, struct wist_ast_expr *expr) {
     struct code_builder builder;
-    IGNORE(vm);
 
     struct wist_lir_expr *lir_expr = wist_compiler_lir_gen_expr(comp, expr);
-
 
     wist_lir_print_expr(lir_expr);
 
@@ -61,13 +59,48 @@ struct wist_handle *wist_compiler_vm_gen_expr(struct wist_compiler *comp,
             WIST_VECTOR_LEN(&builder.code, uint8_t));
 
     wist_lir_expr_destroy(comp, lir_expr);
-
     wist_vm_obj_print_clo(vm, clo);
 
     struct wist_handle *handle = wist_vm_add_handle(vm);
     handle->obj = clo;
 
     return handle;
+}
+
+struct wist_handle *wist_compiler_vm_gen_decl(struct wist_compiler *comp, 
+        struct wist_vm *vm, struct wist_ast_decl *decl) {
+    switch (decl->t) {
+        case WIST_AST_DECL_BIND: {
+            struct code_builder builder;
+            struct wist_lir_expr *lir = wist_compiler_lir_gen_expr(comp, 
+                    decl->bind.body);
+            code_builder_init(comp->ctx, &builder);
+
+            gen_expr_rec(&builder, lir);
+
+            code_builder_add_8(&builder, WIST_VM_OP_SETGLOBAL);
+            code_builder_add_64(&builder, (uint64_t) decl->bind.sym);
+            code_builder_add_8(&builder, WIST_VM_OP_RETURN);
+            struct wist_vm_obj clo = WIST_VM_GC_ALLOC(&vm->gc, 2, 
+                    WIST_VM_OBJ_CLO);
+            WIST_VM_OBJ_FIELD1(clo) = WIST_VM_GC_ALLOC(&vm->gc, 0, 
+                    WIST_VM_OBJ_ENV);
+            WIST_VM_OBJ_FIELD2(clo).idx = WIST_VECTOR_LEN(&vm->code_area, 
+                    uint8_t);
+
+            WIST_VECTOR_PUSH_ARR(vm->ctx, &vm->code_area, uint8_t, 
+                    WIST_VECTOR_DATA(&builder.code, uint8_t), 
+                    WIST_VECTOR_LEN(&builder.code, uint8_t));
+            wist_lir_expr_destroy(comp, lir);
+            wist_vm_obj_print_clo(vm, clo);
+
+            struct wist_handle *handle = wist_vm_add_handle(vm);
+            handle->obj = clo;
+
+            return handle;
+        }
+    }
+    return NULL;
 }
 
 /* === PRIVATES=== */
@@ -176,6 +209,11 @@ static void gen_expr_rec(struct code_builder *builder,
         case WIST_LIR_EXPR_VAR: {
             code_builder_add_8(builder, WIST_VM_OP_ACCESS);
             code_builder_add_8(builder, expr->var.index);
+            break;
+        }
+        case WIST_LIR_EXPR_GVAR: {
+            code_builder_add_8(builder, WIST_VM_OP_GETGLOBAL);
+            code_builder_add_64(builder, (uint64_t) expr->gvar.sym);
             break;
         }
         case WIST_LIR_EXPR_MKB: {

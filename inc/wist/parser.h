@@ -12,5 +12,7 @@
 
 struct wist_ast_expr *wist_parse_expr(struct wist_compiler *comp, 
         struct wist_token *tokens, size_t tokens_len);
+struct wist_ast_decl *wist_parse_decl(struct wist_compiler *comp, 
+        struct wist_token *tokens, size_t tokens_len);
 
 #endif /* _WIST_PARSER_H */

@@ -22,6 +22,7 @@ const char *lir_expr_to_string_map[] = {
     [WIST_LIR_EXPR_APP] = "Application",
     [WIST_LIR_EXPR_LET] = "Let",
     [WIST_LIR_EXPR_VAR] = "Variable",
+    [WIST_LIR_EXPR_GVAR] = "Global Variable",
     [WIST_LIR_EXPR_INT] = "Integer",
     [WIST_LIR_EXPR_MKB] = "Make Block",
 };
@@ -60,6 +61,7 @@ void wist_lir_expr_destroy(struct wist_compiler *comp,
             wist_lir_expr_destroy(comp, expr->app.arg);
             break;
         case WIST_LIR_EXPR_VAR:
+        case WIST_LIR_EXPR_GVAR:
         case WIST_LIR_EXPR_INT:
             break;
     }
@@ -103,6 +105,13 @@ struct wist_lir_expr *wist_lir_create_var(struct wist_compiler *comp,
     struct wist_lir_expr *expr = wist_lir_create_expr(comp, WIST_LIR_EXPR_VAR);
     expr->var.index = index;
     expr->var.origin = origin;
+    return expr;
+}
+
+struct wist_lir_expr *wist_lir_create_gvar(struct wist_compiler *comp,
+        struct wist_sym *sym) {
+    struct wist_lir_expr *expr = wist_lir_create_expr(comp, WIST_LIR_EXPR_GVAR);
+    expr->gvar.sym = sym;
     return expr;
 }
 
@@ -180,6 +189,9 @@ static struct wist_lir_expr *gen_expr_rec(struct wist_compiler *comp,
             printf("Impossible case of no binding for lambda in gen_expr_rec\n");
             return NULL;
         }
+        case WIST_AST_EXPR_GVAR: {
+            return wist_lir_create_gvar(comp, expr->gvar.sym);
+        }
         case WIST_AST_EXPR_TUPLE: {
             struct wist_vector lir_fields;
             WIST_VECTOR_INIT(comp->ctx, &lir_fields, struct wist_lir_expr *);
@@ -223,6 +235,10 @@ static void print_expr_indent(struct wist_lir_expr *expr, int indent) {
             break;
         case WIST_LIR_EXPR_VAR:
             printf(" : %d : %p", expr->var.index, expr->var.origin);
+            break;
+        case WIST_LIR_EXPR_GVAR:
+            printf(" : '%.*s'", (int) expr->gvar.sym->str_len, 
+                    (const uint8_t *) expr->gvar.sym->str);
             break;
         case WIST_LIR_EXPR_MKB:
             WIST_VECTOR_FOR_EACH(&expr->mkb.fields, struct wist_lir_expr *, 

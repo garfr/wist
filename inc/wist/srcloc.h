@@ -28,13 +28,17 @@ struct wist_wsrcloc {
 /* Maps between fake srclocs and their wide counterparts. */
 struct wist_srcloc_index {
     struct wist_vector locs;
-    const uint8_t *src;
-    size_t src_len;
+    struct wist_vector segments;
+    size_t cur_segment, cur_base;
 };
 
 /* Initializes an index. */
 void wist_srcloc_index_init(struct wist_ctx *ctx, 
-        struct wist_srcloc_index *index, const uint8_t *src, size_t src_len);
+        struct wist_srcloc_index *index);
+
+/* Adds a text segment to an index. */
+void wist_srcloc_index_add_segment(struct wist_ctx *ctx, 
+        struct wist_srcloc_index *index, const uint8_t *src, size_t srclen);
 
 /* Releases all data owned by an index. */
 void wist_srcloc_index_finish(struct wist_ctx *ctx, struct wist_srcloc_index *index);

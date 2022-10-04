@@ -63,6 +63,7 @@ struct wist_ast_type {
 enum wist_ast_expr_kind {
     WIST_AST_EXPR_LAM,
     WIST_AST_EXPR_VAR,
+    WIST_AST_EXPR_GVAR,
     WIST_AST_EXPR_APP,
     WIST_AST_EXPR_LET,
     WIST_AST_EXPR_INT,
@@ -81,6 +82,12 @@ struct wist_ast_expr {
             /* [var] is NULL until semantic analysis is over. */
             struct wist_ast_var_entry *var;
         } var;
+
+        struct {
+            struct wist_sym *sym;
+            /* [var] is NULL until semantic analysis is over. */
+            struct wist_toplvl_entry *var;
+        } gvar;
 
         struct {
             struct wist_ast_expr *body;
@@ -110,6 +117,23 @@ struct wist_ast_expr {
         struct {
             struct wist_vector fields; /* struct wist_ast_expr * */
         } tuple;
+    };
+};
+
+enum wist_ast_decl_kind {
+    WIST_AST_DECL_BIND,
+};
+
+struct wist_ast_decl {
+    enum wist_ast_decl_kind t;
+    struct wist_srcloc loc;
+
+    union {
+        struct {
+            struct wist_ast_type *type;
+            struct wist_sym *sym;
+            struct wist_ast_expr *body;
+        } bind;
     };
 };
 
@@ -145,9 +169,14 @@ struct wist_ast_type *wist_ast_create_gen_type(struct wist_compiler *comp,
         uint64_t id);
 struct wist_ast_type *wist_ast_create_int_type(struct wist_compiler *comp);
 
+struct wist_ast_decl *wist_ast_create_bind(struct wist_compiler *comp,
+        struct wist_srcloc src, struct wist_sym *sym, 
+        struct wist_ast_expr *body);
+
 /* === PRETTY PRINTING === */
 
 void wist_ast_print_expr(struct wist_compiler *comp, struct wist_ast_expr *expr);
+void wist_ast_print_decl(struct wist_compiler *comp, struct wist_ast_decl *decl);
 void wist_ast_print_type(struct wist_compiler *comp, struct wist_ast_type *type);
 
 /* === SCOPES === */

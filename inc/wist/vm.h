@@ -12,8 +12,17 @@
 #include <wist/vm_gc.h>
 #include <wist/lexer.h>
 
+#define WIST_MAX_HANDLE_FRAMES 256
+#define WIST_HANDLES_PER_FRAME 32
+
 struct wist_handle {
     struct wist_vm_obj obj;
+};
+
+
+struct wist_handle_frame {
+    struct wist_handle handles[WIST_HANDLES_PER_FRAME];
+    size_t cur_handle;
 };
 
 struct wist_vm {
@@ -21,6 +30,10 @@ struct wist_vm {
     struct wist_vm_gc gc;
     struct wist_vector handles;
     struct wist_vector code_area;
+    struct wist_toplvl *toplvl;
+
+    struct wist_handle_frame frames[WIST_MAX_HANDLE_FRAMES];
+    size_t cur_frame;
 };
 
 struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm, 

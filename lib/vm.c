@@ -7,6 +7,7 @@
 #include <wist/vm.h>
 #include <wist/ctx.h>
 #include <wist/defs.h>
+#include <wist/toplevel.h>
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -29,6 +30,8 @@ struct wist_vm *wist_vm_create(struct wist_ctx *ctx) {
     struct wist_vm *vm = WIST_CTX_NEW(ctx, struct wist_vm);
     vm->ctx = ctx;
     wist_vm_gc_init(ctx, &vm->gc);
+    vm->cur_frame = 0;
+    vm->frames[vm->cur_frame].cur_handle = 0;
     WIST_VECTOR_INIT(ctx, &vm->handles, struct wist_handle);
     WIST_VECTOR_INIT(ctx, &vm->code_area, uint8_t);
     return vm;
@@ -41,7 +44,8 @@ void wist_vm_destroy(struct wist_vm *vm) {
 }
 
 struct wist_handle *wist_vm_add_handle(struct wist_vm *vm) {
-    return WIST_CTX_NEW(vm->ctx, struct wist_handle);
+    struct wist_handle_frame *frame = &vm->frames[vm->cur_frame];
+    return &frame->handles[frame->cur_handle++];
 }
 
 struct wist_handle *wist_vm_eval(struct wist_vm *vm, 
@@ -115,6 +119,22 @@ struct wist_vm_obj wist_vm_interpret(struct wist_vm *vm,
             case WIST_VM_OP_PUSHMARK: {
                 asp->t = WIST_VM_OBJ_MARK;
                 asp++;
+                break;
+            }
+            case WIST_VM_OP_SETGLOBAL: {
+                struct wist_sym *sym = *((struct wist_sym **) pc);
+                pc += sizeof(struct wist_sym **);
+                struct wist_toplvl_entry *entry = 
+                    wist_toplvl_find(vm->toplvl, sym);
+                entry->val = accum;
+                break;
+            }
+            case WIST_VM_OP_GETGLOBAL: {
+                struct wist_sym *sym = *((struct wist_sym **) pc);
+                pc += sizeof(struct wist_sym **);
+                struct wist_toplvl_entry *entry = 
+                    wist_toplvl_find(vm->toplvl, sym);
+                accum = entry->val;
                 break;
             }
             case WIST_VM_OP_GRAB: {

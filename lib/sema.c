@@ -80,8 +80,9 @@ static uint64_t type_var_renamer_rename(struct type_var_renamer *rename,
 /* === PUBLICS === */
 
 void wist_sema_infer_expr(struct wist_compiler *comp, 
-        struct wist_ast_scope *scope, struct wist_ast_expr *expr) {
+        struct wist_ast_expr *expr) {
     struct type_var_renamer renamer;
+    struct wist_ast_scope *scope = NULL;
     /* Make sure our type variables start at 0 again. */
 
     comp->next_type_id = 0;
@@ -97,6 +98,19 @@ void wist_sema_infer_expr(struct wist_compiler *comp,
     wist_objpool_finish(&comp->type_var_pool);
 }
 
+void wist_sema_infer_decl(struct wist_compiler *comp, 
+        struct wist_ast_decl *decl) {
+    switch (decl->t) {
+        case WIST_AST_DECL_BIND:
+            wist_sema_infer_expr(comp, decl->bind.body);
+            decl->bind.type = decl->bind.body->type;
+            struct wist_toplvl_entry *entry = wist_toplvl_add(&comp->toplvl, 
+                    decl->bind.sym);
+            entry->type = decl->bind.type;
+            break;
+    }
+}
+
 /* === PRIVATES === */
 
 static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
@@ -104,15 +118,31 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
         struct type_chain *non_generics) {
     switch (expr->t) {
         case WIST_AST_EXPR_VAR: {
-            struct wist_ast_var_entry *entry = wist_ast_scope_find(scope, expr->var.sym);
+            struct wist_ast_var_entry *entry = 
+                wist_ast_scope_find(scope, expr->var.sym);
             if (entry == NULL) {
-                struct wist_diag *diag = wist_compiler_add_diag(comp, 
-                        WIST_DIAG_UNKNOWN_VAR, WIST_DIAG_ERROR);
-                wist_diag_add_loc(comp, diag, expr->loc);
-                diag->unknown_var = expr->var.sym;
+                struct wist_toplvl_entry *toplvl = 
+                    wist_toplvl_find(&comp->toplvl, expr->var.sym);
+                if (toplvl == NULL) {
+                    struct wist_diag *diag = wist_compiler_add_diag(comp, 
+                            WIST_DIAG_UNKNOWN_VAR, WIST_DIAG_ERROR);
+                    wist_diag_add_loc(comp, diag, expr->loc);
+                    diag->unknown_var = expr->var.sym;
+                } else {
+                    /* 
+                     * We need to save the old expression, while we convert 
+                     * it to a global var. 
+                     */
+                    struct wist_ast_expr old = *expr;
+                    expr->t = WIST_AST_EXPR_GVAR;
+                    expr->gvar.sym = old.var.sym;
+                    expr->gvar.var = toplvl;
+                    expr->type = toplvl->type;
+                }
+            } else {
+                expr->var.var = entry;
+                expr->type = fresh_type(comp, entry->type, non_generics);
             }
-            expr->var.var = entry;
-            expr->type = fresh_type(comp, entry->type, non_generics);
             break;
         }
         case WIST_AST_EXPR_LET: {
@@ -435,6 +465,7 @@ static void prune_full_expr(struct wist_compiler *comp,
             }
             break;
         case WIST_AST_EXPR_VAR:
+        case WIST_AST_EXPR_GVAR:
         case WIST_AST_EXPR_INT:
             break;
     }

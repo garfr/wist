@@ -35,6 +35,7 @@ void _wist_objpool_init(struct wist_ctx *ctx, struct wist_objpool *pool,
     pool->chunk_size = obj_size * 64;
 
     pool->free = NULL;
+    pool->chunk = NULL;
     pool->chunk = new_chunk(pool);
 }
 
