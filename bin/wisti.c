@@ -24,7 +24,7 @@ int main()
 
     struct wist_vm *vm = wist_vm_create(ctx);
 
-    const char toplvl_src[] = "x = 3";
+    const char toplvl_src[] = "x = x";
     const char expr_src[] = "x";
 
     struct wist_ast_decl *decl;

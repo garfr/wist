@@ -79,7 +79,7 @@ static uint64_t type_var_renamer_rename(struct type_var_renamer *rename,
 
 /* === PUBLICS === */
 
-void wist_sema_infer_expr(struct wist_compiler *comp, 
+bool wist_sema_infer_expr(struct wist_compiler *comp, 
         struct wist_ast_expr *expr) {
     struct type_var_renamer renamer;
     struct wist_ast_scope *scope = NULL;
@@ -87,7 +87,9 @@ void wist_sema_infer_expr(struct wist_compiler *comp,
 
     comp->next_type_id = 0;
     WIST_OBJPOOL_INIT(comp->ctx, &comp->type_var_pool, struct wist_ast_type);
-    infer_expr_rec(comp, scope, expr, NULL);
+    if (infer_expr_rec(comp, scope, expr, NULL) == NULL) {
+        return false;
+    }
 
     type_var_renamer_init(comp, &renamer);
     prune_full_expr(comp, expr, &renamer);
@@ -96,19 +98,23 @@ void wist_sema_infer_expr(struct wist_compiler *comp,
 
     /* Release all the type variables we just pruned/renamed. */
     wist_objpool_finish(&comp->type_var_pool);
+    return true;
 }
 
-void wist_sema_infer_decl(struct wist_compiler *comp, 
+bool wist_sema_infer_decl(struct wist_compiler *comp, 
         struct wist_ast_decl *decl) {
     switch (decl->t) {
         case WIST_AST_DECL_BIND:
-            wist_sema_infer_expr(comp, decl->bind.body);
+            if (!wist_sema_infer_expr(comp, decl->bind.body)) {
+                return false;
+            }
             decl->bind.type = decl->bind.body->type;
             struct wist_toplvl_entry *entry = wist_toplvl_add(&comp->toplvl, 
                     decl->bind.sym);
             entry->type = decl->bind.type;
             break;
     }
+    return true;
 }
 
 /* === PRIVATES === */
@@ -128,6 +134,7 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
                             WIST_DIAG_UNKNOWN_VAR, WIST_DIAG_ERROR);
                     wist_diag_add_loc(comp, diag, expr->loc);
                     diag->unknown_var = expr->var.sym;
+                    return NULL;
                 } else {
                     /* 
                      * We need to save the old expression, while we convert 
@@ -148,10 +155,16 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
         case WIST_AST_EXPR_LET: {
             struct wist_ast_type *val_ty = infer_expr_rec(comp, scope, 
                     expr->let.val, non_generics);
+            if (val_ty == NULL) {
+                return NULL;
+            }
             struct wist_ast_scope *new_scope = wist_ast_scope_push(comp, scope);
             struct wist_ast_var_entry *entry = wist_ast_scope_insert(comp, 
                     new_scope, expr->let.sym, val_ty);
             expr->type = infer_expr_rec(comp, new_scope, expr->let.body, non_generics);
+            if (expr->type == NULL) {
+                return NULL;
+            }
             expr->let.scope = new_scope;
             expr->let.var = entry;
             break;
@@ -170,6 +183,9 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             new_non_generics->type = arg_ty;
             struct wist_ast_type *ret_ty = infer_expr_rec(comp, new_scope,
                     expr->lam.body, new_non_generics);
+            if (ret_ty == NULL) {
+                return NULL;
+            }
 
             WIST_CTX_FREE(comp->ctx, new_non_generics, struct type_chain);
             expr->type = wist_ast_create_fun_type(comp, arg_ty, ret_ty);
@@ -178,8 +194,14 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
         case WIST_AST_EXPR_APP: {
             struct wist_ast_type *fun_type = infer_expr_rec(comp, scope, 
                     expr->app.fun, non_generics);
+            if (fun_type == NULL) {
+                return NULL;
+            }
             struct wist_ast_type *arg_type = infer_expr_rec(comp, scope,
                     expr->app.arg, non_generics);
+            if (arg_type == NULL) {
+                return NULL;
+            }
             struct wist_ast_type *ret_type = wist_ast_create_var_type(comp);
             comp->cur_expr = expr;
             unify(comp, wist_ast_create_fun_type(comp, arg_type, ret_type), fun_type);
@@ -192,6 +214,9 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
             WIST_VECTOR_FOR_EACH(&expr->tuple.fields, struct wist_ast_expr *, field) {
                 struct wist_ast_type *field_ty = infer_expr_rec(comp, scope, 
                         *field, non_generics);
+                if (field_ty == NULL) {
+                    return NULL;
+                }
                 WIST_VECTOR_PUSH(comp->ctx, &types, struct wist_ast_type *, &field_ty);
             }
             expr->type = wist_ast_create_tuple_type(comp, types);

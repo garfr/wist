@@ -86,12 +86,19 @@ static struct wist_map_entry *wist_map_efind(struct wist_ctx *ctx,
 static void *_wist_map_insert(struct wist_ctx *ctx, struct wist_map *map,
         void *key, void *val) {
     struct wist_map_entry *entry = wist_map_einsert(ctx, map, key, val);
+    if (entry == NULL) {
+        return NULL;
+    }
+
     return entry->data + map->key_size;
 }
 
 static void *_wist_map_find(struct wist_ctx *ctx, struct wist_map *map,
         void *key) {
     struct wist_map_entry *entry = wist_map_efind(ctx, map, key);
+    if (entry == NULL) {
+        return NULL;
+    }
     return entry->data + map->key_size;
 }
 

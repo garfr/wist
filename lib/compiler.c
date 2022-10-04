@@ -61,7 +61,9 @@ struct wist_parse_result *wist_compiler_parse_decl(struct wist_compiler *comp,
 
     struct wist_ast_decl *decl = wist_parse_decl(comp, tokens, tokens_len);
 
-    wist_sema_infer_decl(comp, decl);
+    if (!wist_sema_infer_decl(comp, decl)) {
+        return result;
+    }
 
     wist_ast_print_decl(comp, decl);
 
@@ -98,7 +100,9 @@ struct wist_parse_result *wist_compiler_parse_expr(struct wist_compiler *comp,
         return result;
     }
 
-    wist_sema_infer_expr(comp, expr);
+    if (!wist_sema_infer_expr(comp, expr)) {
+        return result;
+    }
 
     wist_ast_print_expr(comp, expr);
 

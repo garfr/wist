@@ -9,9 +9,9 @@
 
 #include <wist.h>
 
-void wist_sema_infer_expr(struct wist_compiler *comp, 
+bool wist_sema_infer_expr(struct wist_compiler *comp, 
         struct wist_ast_expr *expr);
-void wist_sema_infer_decl(struct wist_compiler *comp, 
+bool wist_sema_infer_decl(struct wist_compiler *comp, 
         struct wist_ast_decl *decl);
 
 #endif /* _WIST_SEMA_H */
