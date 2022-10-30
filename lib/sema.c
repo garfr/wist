@@ -126,9 +126,11 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
         case WIST_AST_EXPR_VAR: {
             struct wist_ast_var_entry *entry = 
                 wist_ast_scope_find(scope, expr->var.sym);
+            /* Is this not a local variable ? */
             if (entry == NULL) {
                 struct wist_toplvl_entry *toplvl = 
                     wist_toplvl_find(&comp->toplvl, expr->var.sym);
+                /* It's not local, so is it global? */
                 if (toplvl == NULL) {
                     struct wist_diag *diag = wist_compiler_add_diag(comp, 
                             WIST_DIAG_UNKNOWN_VAR, WIST_DIAG_ERROR);
@@ -138,7 +140,7 @@ static struct wist_ast_type *infer_expr_rec(struct wist_compiler *comp,
                 } else {
                     /* 
                      * We need to save the old expression, while we convert 
-                     * it to a global var. 
+                     * it to a global var expression. 
                      */
                     struct wist_ast_expr old = *expr;
                     expr->t = WIST_AST_EXPR_GVAR;
